@@ -1,0 +1,35 @@
+# Build output and Xcode user settings
+.DS_Store
+.build/
+.swiftpm/
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
+*.app/
+*.appex/
+*.dSYM/
+*.zip
+
+# Personal signing and local secrets
+Signing.local.json
+.env
+.env.*
+!.env.example
+*.p12
+*.p8
+*.mobileprovision
+*.provisionprofile
+*.cer
+*.key
+*.pem
+
+# Personal calendar data, backups and private pet art
+*.ics
+*.json.backup
+schedule-v1.json
+schedule-v1.json.*
+*-数据备份.json
+Resources/WindowPet.png
+Resources/WindowPet.*
+custom.png
