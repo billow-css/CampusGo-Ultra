@@ -33,3 +33,9 @@ schedule-v1.json.*
 Resources/WindowPet.png
 Resources/WindowPet.*
 custom.png
+
+# Release packaging output
+dist/
+__pycache__/
+*.pyc
+*.dmg

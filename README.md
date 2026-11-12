@@ -2,7 +2,13 @@
 
 面向大学生的 macOS 原生日程应用，把一周课表、考试、作业和个人待办放在一起。使用 SwiftUI 构建，配套 WidgetKit 桌面小组件，支持本地数据保存与可扩展的内置模块。
 
-> 当前版本为早期开发版，主要界面语言为简体中文。源码可自行构建，仓库不提供已公证的安装包。本项目为个人项目，与南京信息工程大学或其他学校无官方隶属关系。
+> 当前版本为早期开发版，主要界面语言为简体中文。提供未经 Apple 公证的 DMG 测试版，也可自行构建源码。本项目为个人项目，与南京信息工程大学或其他学校无官方隶属关系。
+
+## 下载与安装
+
+前往 [GitHub Releases](https://github.com/billow-css/CampusGo-Ultra/releases) 下载 **DMG 测试版**，支持 macOS 14+、Apple 芯片与 Intel Mac。打开后将应用拖入 Applications（应用程序）。DMG 内附有安装与首次打开教程，完整说明见 [安装指南](Docs/Installation.md)。
+
+测试版采用临时签名，没有 Developer ID 签名与 Apple 公证。首次被系统阻止时，可在确认来源后按教程进入 **系统设置 → 隐私与安全性 → 仍要打开**。小组件跨设备共享数据访问尚未验证，可能需要自行配置签名和 App Group；此操作不会自动补齐这些能力。
 
 ## 功能
 
@@ -99,6 +105,18 @@ swift test
 Swift Package 仅包含可独立测试的核心逻辑，不构建整个 SwiftUI 应用。当前包含 121 项核心测试，覆盖日历解析、周课表布局、考试与截止提醒、作业编号、番茄钟状态机、桌宠定位、模块注册与布局，以及数据兼容。
 
 上述测试和无签名编译可用于本地检查。系统授权、桌面小组件注册和完整鼠标交互仍需要在实际 Mac 环境中验证。
+
+## 制作 DMG 测试版
+
+在 macOS 上完成上面的通用无签名 Release 编译后，可运行：
+
+```sh
+python3 Tools/package_dmg.py \
+  --app "DerivedData/Build/Products/Release/CampusGo Ultra.app" \
+  --output dist/CampusGo-Ultra-0.1.0-universal.dmg
+```
+
+构建时应指定 `ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO`。脚本检查双架构与私人图片排除，为主应用及扩展添加临时签名，生成包含 Applications 快捷入口、安装教程、LICENSE 和 NOTICE 的 DMG，并输出 SHA-256 校验文件。该过程不会进行 Apple 公证，也不授予跨设备共享组能力。
 
 ## 项目结构
 
