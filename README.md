@@ -1,5 +1,7 @@
 # CampusGo Ultra
 
+<img width="112" height="112" alt="b143421a-2101-444f-b95f-6ec6777c67f5" src="https://github.com/user-attachments/assets/51d81ac5-cac0-4bba-9c4d-1a6c31c3407d" />
+
 面向大学生的 macOS 原生日程应用，把一周课表、考试、作业和个人待办放在一起。使用 SwiftUI 构建，配套 WidgetKit 桌面小组件，支持本地数据保存与可扩展的内置模块。
 
 > 当前版本为早期开发版，主要界面语言为简体中文。提供未经 Apple 公证的 DMG 测试版，也可自行构建源码。本项目为个人项目，与南京信息工程大学或其他学校无官方隶属关系。
