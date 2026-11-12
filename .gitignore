@@ -39,3 +39,11 @@ dist/
 __pycache__/
 *.pyc
 *.dmg
+
+# Cross-platform desktop dependencies and builds
+node_modules/
+Desktop/dist/
+Desktop/src-tauri/target/
+Desktop/src-tauri/gen/
+Desktop/playwright-report/
+Desktop/test-results/

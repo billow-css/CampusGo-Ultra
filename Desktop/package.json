@@ -1,0 +1,31 @@
+{
+  "name": "campusgo-desktop",
+  "private": true,
+  "version": "0.2.0-alpha.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "test": "vitest run src",
+    "tauri": "tauri",
+    "test:e2e": "playwright test",
+    "format": "prettier --write src tests *.ts"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2",
+    "ical.js": "^2",
+    "lucide-react": "^0.468",
+    "react": "^19",
+    "react-dom": "^19"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50",
+    "@tauri-apps/cli": "^2",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "prettier": "^3.10.0",
+    "typescript": "~5.7",
+    "vite": "^6",
+    "vitest": "^5.1.0"
+  }
+}
