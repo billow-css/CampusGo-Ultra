@@ -25,6 +25,10 @@ npm run test:e2e
 
 Windows 端交接步骤见 [Windows 构建指南](../Docs/Windows.md)。
 
+Fedora x86_64 的 RPM 配置与构建步骤见 [Fedora 构建指南](../Docs/Fedora.md)。
+在仓库根目录执行 `bash Tools/build-fedora.sh --install-deps`；Windows 可执行
+`powershell -ExecutionPolicy Bypass -File Tools/build-windows.ps1`，输出在 `dist/`。
+
 ## Tauri 开发与 Windows 构建
 
 安装 Rust stable。Windows 还需 Microsoft C++ Build Tools 与 WebView2，详见 [Tauri 官方环境要求](https://v2.tauri.app/start/prerequisites/)。

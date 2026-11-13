@@ -27,7 +27,19 @@ npm run tauri build
 
 如果已经克隆仓库，先在没有未提交修改的情况下执行 `git pull`，然后进入 `Desktop`。保留 `package-lock.json` 和 `src-tauri/Cargo.lock`，不要为了编译随意升级全部依赖。
 
-NSIS 安装程序输出在 `Desktop/src-tauri/target/release/bundle/nsis/`。这是尚未经过 Windows 实机验证的开发预览；安装包尚未配置发布者代码签名，不能宣称已签名、已公证或通过 SmartScreen。
+NSIS 安装程序输出在 `Desktop/src-tauri/target/release/bundle/nsis/`。这是开发预览版；本次 Windows 构建与安装检查见 [打包记录](Packaging.md)。安装包尚未配置发布者代码签名。
+
+也可在仓库根目录运行可重复打包脚本：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File Tools/build-windows.ps1
+```
+
+脚本固定构建 `x86_64-pc-windows-msvc`，执行前端 / Rust 测试并使用 Cargo
+`--locked`，然后将安装程序、许可证和 SHA-256 校验和复制到
+`dist/windows-x86_64/`。指定目标后，Tauri 原始产物位于
+`Desktop/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/`。
+首次启动安装程序需要 Windows WebView2；若机器未安装，安装程序会联网获取运行时。
 
 ## 运行与检查
 
