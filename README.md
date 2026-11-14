@@ -12,11 +12,13 @@
 
 测试版采用临时签名，没有 Developer ID 签名与 Apple 公证。首次被系统阻止时，可在确认来源后按教程进入 **系统设置 → 隐私与安全性 → 仍要打开**。小组件跨设备共享数据访问尚未验证，可能需要自行配置签名和 App Group；此操作不会自动补齐这些能力。
 
-## Windows / 跨平台开发预览
+## Windows / Fedora · 1.0.0 LTS
 
-`Desktop/` 中新增 **Tauri 2 + Rust + React/TypeScript** 版本，尽量沿用现有 Mac 版的导航、紧凑周课表、登机牌、日程 / 作业双栏与主题。开发启动方式与当前功能边界见 [Desktop/README.md](Desktop/README.md)。
+`Desktop/` 提供 **Tauri 2 + Rust + React/TypeScript** 版本，沿用现有 Mac 版的导航、紧凑周课表、登机牌、日程 / 作业双栏与主题。开发启动方式与当前功能边界见 [Desktop/README.md](Desktop/README.md)。
 
-这是独立的数据与构建入口，尚未发布经过 Windows 实机验证的安装程序，不影响本仓库现有 Mac 版和 DMG。
+前往 [1.0.0 LTS for Windows/Fedora](https://github.com/billow-css/CampusGo-Ultra/releases/tag/v1.0.0)
+下载 Windows x64 安装包或 Fedora x86_64 构建套件。Windows 包已完成本机安装与运行检查；
+Fedora 套件提供源码和 RPM 构建脚本，本次未提供预编译 RPM。桌面版数据与 Mac SwiftUI 版独立，原有 Mac DMG 保留。
 
 ## 功能
 

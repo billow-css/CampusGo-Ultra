@@ -30,7 +30,7 @@ try {
     Invoke-Checked 'npm.cmd' @('run', 'tauri', '--', 'build', '--ci', '--target', $target, '--bundles', 'nsis', '--', '--locked')
     $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
     $bundle = Join-Path $env:CARGO_TARGET_DIR "$target\release\bundle\nsis"
-    $installers = @(Get-ChildItem -LiteralPath $bundle -Filter '*-setup.exe')
+    $installers = @(Get-ChildItem -LiteralPath $bundle -Filter "*_${version}_x64-setup.exe")
     if ($installers.Count -ne 1) { throw "Expected one installer, found $($installers.Count) in $bundle" }
     New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
     $name = "CampusGo-Ultra_${version}_windows-x86_64-setup.exe"

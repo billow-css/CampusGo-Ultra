@@ -2,7 +2,20 @@
 use std::{fs, io::Write, sync::Mutex, time::Duration};
 use tauri::Manager;
 use serde_json::Value;
+mod access;
+use access::AccessControl;
 struct StoreLock(Mutex<()>);
+#[tauri::command]
+fn access_status(access: tauri::State<AccessControl>) -> Result<&'static str, String> { access.status() }
+#[tauri::command]
+fn verify_qq(access: tauri::State<AccessControl>, qq: String) -> Result<&'static str, String> {
+    if access.status()? == "blocked" { return Ok("blocked"); }
+    if access.submit(&qq)? { Ok("allowed") } else { Ok("blocked") }
+}
+#[tauri::command]
+fn exit_access_check(app: tauri::AppHandle, access: tauri::State<AccessControl>) {
+    app.exit(if access.status().ok() == Some("blocked") { 77 } else { 0 });
+}
 fn validate(data: &Value) -> Result<(), String> {
     if data.get("version").and_then(Value::as_u64) != Some(1)
         || !["courses", "todos", "homework", "usedNumbers", "modules"].iter().all(|key| data.get(key).is_some_and(Value::is_array)) {
@@ -11,7 +24,8 @@ fn validate(data: &Value) -> Result<(), String> {
     Ok(())
 }
 #[tauri::command]
-fn load_state(app: tauri::AppHandle, lock: tauri::State<StoreLock>) -> Result<Option<Value>, String> {
+fn load_state(app: tauri::AppHandle, lock: tauri::State<StoreLock>, access: tauri::State<AccessControl>) -> Result<Option<Value>, String> {
+    access.ensure_allowed()?;
     let _guard = lock.0.lock().map_err(|_| "Storage lock failed")?;
     let path = app.path().app_data_dir().map_err(|e| e.to_string())?.join("desktop-v1.json");
     if !path.exists() { return Ok(None); }
@@ -21,7 +35,8 @@ fn load_state(app: tauri::AppHandle, lock: tauri::State<StoreLock>) -> Result<Op
     Ok(Some(value))
 }
 #[tauri::command]
-fn save_state(app: tauri::AppHandle, data: Value, lock: tauri::State<StoreLock>) -> Result<(), String> {
+fn save_state(app: tauri::AppHandle, data: Value, lock: tauri::State<StoreLock>, access: tauri::State<AccessControl>) -> Result<(), String> {
+    access.ensure_allowed()?;
     let _guard = lock.0.lock().map_err(|_| "Storage lock failed")?;
     validate(&data)?;
     let directory = app.path().app_data_dir().map_err(|e| e.to_string())?;
@@ -41,7 +56,8 @@ fn write_state(directory: &std::path::Path, data: &Value) -> Result<(), String> 
     Ok(())
 }
 #[tauri::command]
-async fn fetch_calendar(url: String) -> Result<String, String> {
+async fn fetch_calendar(url: String, access: tauri::State<'_, AccessControl>) -> Result<String, String> {
+    access.ensure_allowed()?;
     let normalized = if let Some(rest) = url.strip_prefix("webcal://") { format!("https://{rest}") } else { url };
     let parsed = reqwest::Url::parse(&normalized).map_err(|_| "Invalid subscription URL")?;
     if !["https", "http"].contains(&parsed.scheme()) || parsed.host_str().is_none() { return Err("Only HTTP/HTTPS calendar subscriptions are supported".into()); }
@@ -55,9 +71,11 @@ async fn fetch_calendar(url: String) -> Result<String, String> {
     String::from_utf8(bytes).map_err(|_| "Calendar must be UTF-8".to_string())
 }
 fn main() {
+    let access = AccessControl::new();
     tauri::Builder::default()
+        .manage(access)
         .manage(StoreLock(Mutex::new(())))
-        .invoke_handler(tauri::generate_handler![load_state, save_state, fetch_calendar])
+        .invoke_handler(tauri::generate_handler![access_status, verify_qq, exit_access_check, load_state, save_state, fetch_calendar])
         .run(tauri::generate_context!())
         .expect("Failed to start CampusGo Ultra");
 }

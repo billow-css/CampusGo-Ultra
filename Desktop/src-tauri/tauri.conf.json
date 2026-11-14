@@ -1,9 +1,9 @@
 {
  "$schema":"https://schema.tauri.app/config/2",
  "productName":"CampusGo Ultra",
- "version":"0.2.0-alpha.1",
+ "version":"1.0.0",
  "identifier":"com.campusgo.desktop.preview",
  "build":{"beforeDevCommand":"npm run dev","devUrl":"http://localhost:1420","beforeBuildCommand":"npm run build","frontendDist":"../dist"},
  "app":{"windows":[{"title":"CampusGo Ultra","width":1240,"height":900,"minWidth":960,"minHeight":700}],"security":{"csp":"default-src 'self'; img-src 'self' asset: http://asset.localhost data: blob:; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost"}},
- "bundle":{"active":true,"targets":["nsis"],"icon":["icons/icon.ico","icons/icon.png"],"category":"Education","publisher":"billow-css","homepage":"https://github.com/billow-css/CampusGo-Ultra","license":"Apache-2.0","licenseFile":"../../LICENSE","resources":{"../../LICENSE":"LICENSE","../../NOTICE":"NOTICE"},"shortDescription":"课表、考试、作业与个人日程","windows":{"nsis":{"languages":["SimpChinese","English"],"displayLanguageSelector":true,"installMode":"currentUser"}}}
+ "bundle":{"active":true,"targets":["nsis"],"icon":["icons/icon.ico","icons/icon.png"],"category":"Education","publisher":"billow-css","homepage":"https://github.com/billow-css/CampusGo-Ultra","license":"Apache-2.0","licenseFile":"../../LICENSE","resources":{"../../LICENSE":"LICENSE","../../NOTICE":"NOTICE"},"shortDescription":"课表、考试、作业与个人日程","windows":{"nsis":{"languages":["SimpChinese","English"],"displayLanguageSelector":true,"installMode":"currentUser","installerHooks":"windows/access-hooks.nsh"}}}
 }

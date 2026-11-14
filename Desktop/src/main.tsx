@@ -59,6 +59,7 @@ import {
 } from "./core";
 import { load, save, fetchCalendar, native } from "./storage";
 import "./style.css";
+import { AccessGate } from "./AccessGate";
 const palette = [
   "#00679c",
   "#167f82",
@@ -1775,4 +1776,4 @@ function Pet({
   );
 }
 
-createRoot(document.getElementById("root")!).render(<App />);
+createRoot(document.getElementById("root")!).render(<AccessGate><App /></AccessGate>);
