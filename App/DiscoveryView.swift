@@ -41,7 +41,8 @@ struct DiscoveryView: View {
         }
     }
     private func moduleCard(_ descriptor: ModuleDescriptor) -> some View {
-        VStack(alignment: .leading, spacing: 18) {
+        let ink = descriptor.accent?.color ?? self.ink
+        return VStack(alignment: .leading, spacing: 18) {
             HStack(spacing: 13) {
                 Image(systemName: descriptor.icon).font(.system(size: 25, weight: .medium)).foregroundStyle(ink)
                     .frame(width: 50, height: 50).background(ink.opacity(0.09), in: RoundedRectangle(cornerRadius: 12))
@@ -77,7 +78,7 @@ struct DiscoveryView: View {
                 }
                 Button(descriptor.surfaces.contains(.detail) ? "打开" : "查看") {
                     onOpen(descriptor.id, !descriptor.surfaces.contains(.detail))
-                }.buttonStyle(.borderedProminent).disabled(!manager.isEnabled(descriptor.id))
+                }.buttonStyle(.borderedProminent).tint(ink).disabled(!manager.isEnabled(descriptor.id))
             }.controlSize(.small)
         }.padding(22).background(CampusTheme.board, in: RoundedRectangle(cornerRadius: 15))
             .overlay { RoundedRectangle(cornerRadius: 15).strokeBorder(CampusTheme.boardLine) }
