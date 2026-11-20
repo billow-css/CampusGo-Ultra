@@ -43,7 +43,7 @@ struct NavigationSettingsView: View {
     }
     private func tabRow(_ title: String, icon: String, id: String, detail: String, ink: Color? = nil) -> some View {
         HStack(spacing: 13) {
-            Image(systemName: icon).foregroundStyle(ink ?? accent).frame(width: 22)
+            ModuleIcon(name: icon, size: 16).foregroundStyle(ink ?? accent).frame(width: 22)
             VStack(alignment: .leading, spacing: 4) {
                 Text(title).font(.system(size: 13, weight: .medium)).lineLimit(2)
                 Text(detail).font(.system(size: 11)).foregroundStyle(.secondary)

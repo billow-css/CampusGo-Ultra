@@ -19,6 +19,11 @@ final class GitStore: ObservableObject {
     @Published private(set) var hub: GitHubActivity?
     @Published var commitMessage = ""
     @Published var newBranch = ""
+    @Published private(set) var changingGitHubToken = false
+    @Published private(set) var githubTokenStatus: String?
+    private let github = GitHubActivityService()
+    private var remoteSnapshots: [UUID: (activity: GitHubActivity, date: Date)] = [:]
+    private var lastRemoteAttempt: [UUID: Date] = [:]
     private let storage: ModuleStorage
     private var enabled = true
     private var loadFailed = false
@@ -72,7 +77,7 @@ final class GitStore: ObservableObject {
         guard !busy, selectedID != id else { return }
         cancel(); hub = nil; selectedID = id; snapshot = GitSnapshot(); refreshedAt = nil
         selectedFile = nil; selectedCommit = nil; preview = ""; commitMessage = ""; notice = nil
-        persist(); refresh()
+        restoreRemoteSnapshot(); persist(); refreshIfDue()
     }
     func addRepository() {
         guard !busy, !loadFailed else { return }
@@ -102,9 +107,11 @@ final class GitStore: ObservableObject {
     func removeSelected() {
         guard !busy, let selectedID else { return }
         cancel(); repositories.removeAll { $0.id == selectedID }
+        remoteSnapshots.removeValue(forKey: selectedID)
+        lastRemoteAttempt.removeValue(forKey: selectedID)
         self.selectedID = repositories.first?.id; hub = nil; snapshot = GitSnapshot(); refreshedAt = nil
         selectedFile = nil; selectedCommit = nil; preview = ""; commitMessage = ""
-        persist(); notice = "已从列表移除，仓库文件保留。"; refresh()
+        restoreRemoteSnapshot(); persist(); notice = "已从列表移除，仓库文件保留。"; refreshIfDue()
     }
     private func start(_ title: String, body: @escaping @MainActor () async throws -> Void) {
         guard enabled, !busy else { return }
@@ -127,16 +134,56 @@ final class GitStore: ObservableObject {
         repositories.append(repo); selectedID = repo.id; snapshot = GitSnapshot(); hub = nil; refreshedAt = nil
         persist(); refresh()
     }
+    private func restoreRemoteSnapshot() {
+        guard let id = selectedID, let cached = remoteSnapshots[id] else { return }
+        hub = cached.activity
+        refreshedAt = cached.date
+    }
+    func setGitHubToken(_ value: String?) async -> Bool {
+        guard !changingGitHubToken else { return false }
+        let token = value?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let token, token.isEmpty || !token.utf8.allSatisfy({ (33...126).contains($0) }) {
+            githubTokenStatus = "请输入完整的 GitHub 访问令牌。"
+            return false
+        }
+        changingGitHubToken = true
+        defer { changingGitHubToken = false }
+        if selected?.github != nil { cancel() }
+        do {
+            try await Task.detached {
+                if let token { try GitHubTokenKeychain.save(token) }
+                else { try GitHubTokenKeychain.remove() }
+            }.value
+            remoteSnapshots.removeAll()
+            lastRemoteAttempt.removeAll()
+            if selected?.github != nil { hub = nil; refreshedAt = nil; errorMessage = nil }
+            githubTokenStatus = token == nil ? "已移除令牌，公开仓库将使用匿名请求。" : "令牌已存入钥匙串，刷新项目时将使用此令牌。"
+        } catch {
+            githubTokenStatus = error.localizedDescription
+            return false
+        }
+        return true
+    }
     func refreshIfDue() {
-        if refreshedAt == nil || Date().timeIntervalSince(refreshedAt!) > 900 { refresh() }
+        guard let repo = selected else { return }
+        let lastCheck = repo.github == nil ? refreshedAt : lastRemoteAttempt[repo.id]
+        if lastCheck.map({ Date().timeIntervalSince($0) >= 900 }) ?? true { refresh() }
     }
     func refresh() {
-        guard let repo = selected, !busy, enabled else { return }
+        guard let repo = selected, !busy, enabled, !changingGitHubToken else { return }
         start("正在刷新…") { [self] in
             if let id = repo.github {
-                let result = try await GitHubActivityService.load(id)
+                lastRemoteAttempt[repo.id] = .now
+                let token = try await Task.detached { try GitHubTokenKeychain.load() }.value
                 try Task.checkCancellation()
-                hub = result; refreshedAt = .now
+                let result = try await github.load(id, token: token, previous: hub)
+                try Task.checkCancellation()
+                hub = result
+                if result.warnings.isEmpty { refreshedAt = .now }
+                if let refreshedAt {
+                    if remoteSnapshots.count >= 16 && remoteSnapshots[repo.id] == nil { remoteSnapshots.removeAll() }
+                    remoteSnapshots[repo.id] = (activity: result, date: refreshedAt)
+                }
                 return
             }
             let url = try resolve(repo); let access = url.startAccessingSecurityScopedResource()

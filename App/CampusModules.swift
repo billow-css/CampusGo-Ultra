@@ -1,6 +1,51 @@
 import SwiftUI
 import Combine
 
+/// Draws a module's custom glyph or falls back to a system symbol.
+struct ModuleIcon: View {
+    static let gitBranch = "campus.git-branch"
+
+    let name: String
+    var size: CGFloat = 16
+
+    var body: some View {
+        if name == Self.gitBranch {
+            GitBranchGlyph()
+                .stroke(.foreground, style: StrokeStyle(lineWidth: size * 0.092, lineCap: .round, lineJoin: .round))
+                .frame(width: size, height: size)
+                .accessibilityHidden(true)
+        } else {
+            Image(systemName: name)
+        }
+    }
+}
+
+private struct GitBranchGlyph: Shape {
+    func path(in rect: CGRect) -> Path {
+        let scale = min(rect.width, rect.height) / 24
+        func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(x: rect.midX + (x - 12) * scale, y: rect.midY + (y - 12) * scale)
+        }
+
+        var path = Path()
+        let radius = 2.25 * scale
+        for center in [point(5.5, 5), point(5.5, 19), point(18.5, 19)] {
+            path.addEllipse(in: CGRect(x: center.x - radius, y: center.y - radius,
+                                       width: radius * 2, height: radius * 2))
+        }
+        path.move(to: point(5.5, 7.25))
+        path.addLine(to: point(5.5, 16.75))
+        path.move(to: point(18.5, 16.75))
+        path.addLine(to: point(18.5, 8.5))
+        path.addQuadCurve(to: point(15, 5), control: point(18.5, 5))
+        path.addLine(to: point(11.5, 5))
+        path.move(to: point(14, 2.5))
+        path.addLine(to: point(11.5, 5))
+        path.addLine(to: point(14, 7.5))
+        return path
+    }
+}
+
 /// Versioned in-process module API. Modules receive values and explicit actions, not AppStore.
 @MainActor
 struct ModuleDataAccess {

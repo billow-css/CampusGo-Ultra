@@ -1,28 +1,25 @@
 # CampusGo Ultra 安装与首次打开
 
-适用于 v0.1.0 测试版，macOS 14 或更高版本，支持 Apple 芯片和 Intel Mac。
+适用于 macOS 测试版，macOS 14 或更高版本，支持 Apple 芯片和 Intel Mac。
 
 ## 安装
 
-1. 从项目 GitHub Releases 下载 `CampusGo-Ultra-0.1.0-universal.dmg`。
-2. 双击打开 DMG，把 **CampusGo Ultra.app** 拖到旁边的 **Applications（应用程序）** 快捷入口。
-3. 安装完成后推出磁盘映像，从“应用程序”文件夹打开 CampusGo Ultra。
-
-请勿直接在只读磁盘映像中长期运行应用。
+- **PKG（0.1.1）**：退出旧版本，从 GitHub Releases 下载 `CampusGo-Ultra-0.1.1-universal.pkg`，双击并按安装器提示操作。安装完成后，从“应用程序”打开 CampusGo Ultra。
+- **DMG（0.1.0）**：打开下载的磁盘映像，将 **CampusGo Ultra.app** 拖入 **Applications（应用程序）**，推出映像后从“应用程序”打开。
 
 ## macOS 提示无法验证开发者或未检查恶意软件
 
-此版本使用临时签名，**没有 Developer ID 签名，也未经 Apple 公证**。macOS 可能阻止首次打开。如果你确认下载自本项目的 Release，且文件未经修改：
+PKG 安装器未签名，应用使用临时签名。**没有 Developer ID 签名，也未经 Apple 公证**，macOS 可能阻止打开安装器或应用。如果你确认下载自本项目的 Release，且文件未经修改：
 
-1. 先从“应用程序”尝试打开一次 CampusGo Ultra，关闭拦截提示。
+1. 先尝试打开下载的 PKG，或从“应用程序”打开 CampusGo Ultra，关闭拦截提示。
 2. 打开 **系统设置 → 隐私与安全性**。
-3. 向下找到关于 CampusGo Ultra 被阻止的提示，点击 **仍要打开**。
+3. 向下找到安装器或 CampusGo Ultra 被阻止的提示，点击 **仍要打开**。
 4. 根据系统要求进行身份验证，并在再次出现的对话框中点击 **打开**。
 5. 后续一般可以直接打开。不同系统版本的文字与位置可能略有不同。
 
 Apple 官方说明：https://support.apple.com/zh-cn/102445
 
-此步骤只为你确认信任的这一个应用添加例外。无需关闭系统整体安全保护。如果系统报告应用包含恶意软件、会损坏电脑，或文件校验不匹配，请停止安装并反馈问题；这些情况不适用上述步骤。受管理的 Mac 可能不允许添加例外。
+此步骤只为你确认信任的这一个安装器或应用添加例外。无需关闭系统整体安全保护。如果系统报告应用包含恶意软件、会损坏电脑，或文件校验不匹配，请停止安装并反馈问题；这些情况不适用上述步骤。受管理的 Mac 可能不允许添加例外。
 
 ## 第一次使用
 
@@ -45,12 +42,12 @@ Apple 官方说明：https://support.apple.com/zh-cn/102445
 
 ## 校验与反馈
 
-Release 同时提供 `SHA256SUMS.txt`。可在终端运行以下命令，将输出与校验文件中的 DMG 值比较：
+Release 同时提供 `SHA256SUMS.txt`。可在终端运行以下命令，将输出与校验文件中的安装包值比较：
 
 ```sh
-shasum -a 256 CampusGo-Ultra-0.1.0-universal.dmg
+shasum -a 256 CampusGo-Ultra-0.1.1-universal.pkg
 ```
 
 项目：https://github.com/billow-css/CampusGo-Ultra
 问题反馈：https://github.com/billow-css/CampusGo-Ultra/issues
-许可证：Apache License 2.0，见安装映像中的 LICENSE。
+许可证：Apache License 2.0，见源码仓库或安装包中的许可证。

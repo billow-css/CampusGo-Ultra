@@ -4,7 +4,7 @@ import Combine
 private enum GitTheme { static let accent = Color.orange }
 struct GitModule: CampusModule {
     let git: GitStore
-    let descriptor = ModuleDescriptor(id: "campus.git", name: "Git", description: "关注项目进展：提交分支图、活跃度、GitHub PR、Issue 与 CI 状态。", icon: "point.3.connected.trianglepath.dotted", surfaces: [.summary, .detail, .settings, .navigation])
+    let descriptor = ModuleDescriptor(id: "campus.git", name: "Git", description: "关注项目进展：提交分支图、活跃度、GitHub PR、Issue 与 CI 状态。", icon: ModuleIcon.gitBranch, surfaces: [.summary, .detail, .settings, .navigation])
     var defaultNavigationVisible: Bool { false }
     var changesPublisher: AnyPublisher<Void, Never>? { git.objectWillChange.eraseToAnyPublisher() }
     func setEnabled(_ enabled: Bool) { git.setEnabled(enabled) }
@@ -17,6 +17,7 @@ struct GitPage: View {
     @State private var addSheet = false
     @State private var repositoryURL = ""
     @State private var showPreview = false
+    @State private var showGitHubAccess = false
     @State private var section = "graph"
     private let ticker = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
     var body: some View {
@@ -26,7 +27,14 @@ struct GitPage: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     header
-                    if let error = git.errorMessage { Label(error, systemImage: "exclamationmark.triangle").font(.system(size: 12)).foregroundStyle(.orange).textSelection(.enabled) }
+                    if let error = git.errorMessage {
+                        Label(error, systemImage: "exclamationmark.triangle").font(.system(size: 12)).foregroundStyle(.orange).textSelection(.enabled)
+                    }
+                    if let warnings = git.hub?.warnings, !warnings.isEmpty {
+                        ForEach(warnings, id: \.self) { warning in
+                            Label(warning, systemImage: "exclamationmark.triangle").font(.system(size: 12)).foregroundStyle(.orange)
+                        }
+                    }
                     if git.selected != nil {
                         hero
                         if git.selected?.github == nil { GitActivityGrid(dates: git.snapshot.activityDates) }
@@ -39,7 +47,11 @@ struct GitPage: View {
                         else if git.selected?.github != nil { remoteActivity }
                         else { workspace }
                     } else {
-                        ContentUnavailableView("关注你的项目", systemImage: "point.3.connected.trianglepath.dotted", description: Text("添加公开 GitHub 仓库，或关联本地项目。"))
+                        ContentUnavailableView {
+                            Label { Text("关注你的项目") } icon: { ModuleIcon(name: ModuleIcon.gitBranch, size: 34) }
+                        } description: {
+                            Text("添加 GitHub 仓库，或关联本地项目。")
+                        }
                     }
                 }.padding(26)
             }
@@ -50,10 +62,17 @@ struct GitPage: View {
             .onChange(of: git.selectedID) { _, _ in section = "graph" }
             .sheet(isPresented: $addSheet) { addProject }
             .sheet(isPresented: $showPreview) { preview }
+            .sheet(isPresented: $showGitHubAccess) {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("GitHub 访问设置").font(.title2.bold())
+                    GitHubAccessFields()
+                    HStack { Spacer(); Button("完成") { showGitHubAccess = false } }.disabled(git.changingGitHubToken)
+                }.padding(24).frame(width: 490)
+            }
     }
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Label("项目关注", systemImage: "point.3.connected.trianglepath.dotted").font(.system(size: 16, weight: .semibold)).padding(.top, 9)
+            Label { Text("项目关注") } icon: { ModuleIcon(name: ModuleIcon.gitBranch, size: 18) }.font(.system(size: 16, weight: .semibold)).padding(.top, 9)
             Button { addSheet = true } label: { Label("添加项目", systemImage: "plus").frame(maxWidth: .infinity) }.buttonStyle(.bordered).disabled(git.busy)
             ScrollView {
                 VStack(spacing: 7) {
@@ -61,7 +80,7 @@ struct GitPage: View {
                         Button { git.select(repo.id) } label: {
                             VStack(alignment: .leading, spacing: 7) {
                                 Label(repo.name, systemImage: repo.github == nil ? "folder" : "network").font(.system(size: 12, weight: .medium)).lineLimit(2)
-                                Text(repo.github == nil ? "本地项目" : "GitHub · 公开仓库").font(.system(size: 10)).foregroundStyle(.secondary)
+                                Text(repo.github == nil ? "本地项目" : "GitHub").font(.system(size: 10)).foregroundStyle(.secondary)
                             }.frame(maxWidth: .infinity, alignment: .leading).padding(11)
                                 .background(git.selectedID == repo.id ? GitTheme.accent.opacity(0.12) : Color.clear, in: RoundedRectangle(cornerRadius: 9))
                                 .contentShape(Rectangle())
@@ -86,6 +105,10 @@ struct GitPage: View {
             Spacer()
             if git.busy { ProgressView().controlSize(.small); Button("取消", action: git.cancel) }
             else { Button(action: git.refresh) { Image(systemName: "arrow.clockwise") }.disabled(git.selected == nil) }
+            if git.selected?.github != nil {
+                Button { showGitHubAccess = true } label: { Image(systemName: "key") }
+                    .help("设置 GitHub 访问令牌")
+            }
             Button(git.selected?.github == nil ? "打开文件夹" : "打开仓库", action: git.openProject).disabled(git.selected == nil)
         }.buttonStyle(.bordered).controlSize(.small)
     }
@@ -146,7 +169,6 @@ struct GitPage: View {
     private var remoteActivity: some View {
         VStack(alignment: .leading, spacing: 20) {
             if let hub = git.hub {
-                ForEach(hub.warnings, id: \.self) { Text($0).font(.caption).foregroundStyle(.orange) }
                 Text("最近 CI 运行").font(.headline)
                 ForEach(hub.runs) { run in
                     Link(destination: run.html_url) { HStack { Image(systemName: run.failed ? "xmark.circle.fill" : run.conclusion == "success" ? "checkmark.circle.fill" : "clock").foregroundStyle(run.failed ? Color.red : .green); Text(run.name ?? "Workflow"); Spacer(); Text(run.conclusion ?? run.status).foregroundStyle(.secondary) } }.buttonStyle(.plain)
@@ -175,7 +197,7 @@ struct GitPage: View {
     private var addProject: some View {
         VStack(alignment: .leading, spacing: 18) {
             Text("关注项目").font(.title2.bold())
-            Text("公开 GitHub 仓库，无需克隆即可查看动态。").foregroundStyle(.secondary)
+            Text("粘贴 GitHub 仓库链接，即可关注项目动态。").foregroundStyle(.secondary)
             TextField("https://github.com/owner/repo", text: $repositoryURL).textFieldStyle(.roundedBorder)
             HStack { Button("选择本地项目…") { addSheet = false; git.addRepository() }; Spacer(); Button("取消") { addSheet = false }; Button("关注") { git.addGitHub(repositoryURL); addSheet = false }.buttonStyle(.borderedProminent).disabled(GitHubActivityService.identifier(repositoryURL) == nil) }
         }.padding(25).frame(width: 500)
@@ -271,7 +293,7 @@ private struct GitSummaryCard: View {
     var body: some View {
         Button(action: onOpen) {
             VStack(alignment: .leading, spacing: 14) {
-                HStack { Label(git.selected?.name ?? "项目关注", systemImage: "point.3.connected.trianglepath.dotted").lineLimit(1); Spacer(); Image(systemName: "arrow.up.right") }.font(.system(size: 14, weight: .semibold))
+                HStack { Label { Text(git.selected?.name ?? "项目关注") } icon: { ModuleIcon(name: ModuleIcon.gitBranch, size: 16) }.lineLimit(1); Spacer(); Image(systemName: "arrow.up.right") }.font(.system(size: 14, weight: .semibold))
                 Text(git.nodes.first?.subject ?? "添加项目，随时查看进展").font(.system(size: 19, weight: .semibold)).lineLimit(2)
                 if let date = git.refreshedAt { Text("更新于 " + date.formatted(date: .abbreviated, time: .shortened)).font(.system(size: 10)).foregroundStyle(.secondary) }
             }.padding(20).frame(maxWidth: .infinity, alignment: .leading).gitPanel()
@@ -285,11 +307,47 @@ private struct GitSettings: View {
         Form {
             if let navigationVisible { Toggle("在顶部显示 Git 标签页", isOn: navigationVisible) }
             Section("项目动态看板") {
-                Text("支持公开 GitHub 仓库和授权的本地项目。添加项目请进入 Git 页面。")
+                Text("支持 GitHub 仓库和授权的本地项目。添加项目请进入 Git 页面。")
                 Text("当前项目在页面打开或应用回到前台时按需刷新，前台页面每 15 分钟更新。关闭插件会停止请求。")
-                Text("本地提交图来自已有 Git 引用，不自动 fetch；远程同步请在编辑器完成。GitHub 动态无需登录，当前不支持私有仓库、个人指派筛选及系统通知。")
+                Text("本地提交图来自已有 Git 引用，不自动 fetch；远程同步请在编辑器完成。公开仓库可以匿名访问，私有仓库需要有读取权限的令牌。")
                 Text("公开接口可能限流；失败时保留上次内容和更新时间。")
             }.font(.system(size: 12))
+            Section("GitHub 访问") { GitHubAccessFields() }
         }.formStyle(.grouped)
+    }
+}
+
+private struct GitHubAccessFields: View {
+    @EnvironmentObject private var git: GitStore
+    @State private var token = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("公开仓库可以匿名访问。添加访问令牌可提高请求额度，也可查看令牌授权的私有仓库。")
+                .font(.system(size: 12)).foregroundStyle(.secondary)
+            SecureField("GitHub 访问令牌", text: $token).textFieldStyle(.roundedBorder)
+                .disabled(git.changingGitHubToken)
+            HStack {
+                Link("创建令牌 ↗", destination: URL(string: "https://github.com/settings/personal-access-tokens")!)
+                Spacer()
+                Button("移除令牌") { apply(nil) }
+                Button("保存并刷新") { apply(token) }.buttonStyle(.borderedProminent)
+                    .disabled(token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }.disabled(git.changingGitHubToken)
+            if let message = git.githubTokenStatus {
+                Text(message).font(.system(size: 11)).foregroundStyle(.secondary)
+            } else {
+                Text("建议使用细粒度令牌，并按需为仓库授予 Contents、Pull requests、Issues 和 Actions 的读取权限。令牌保存在 macOS 钥匙串。")
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
+            }
+        }
+    }
+    private func apply(_ value: String?) {
+        Task {
+            if await git.setGitHubToken(value) {
+                token = ""
+                if git.selected?.github != nil { git.refresh() }
+            }
+        }
     }
 }

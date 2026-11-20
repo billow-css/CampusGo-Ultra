@@ -4,11 +4,11 @@
 
 面向大学生的 macOS 原生日程应用，把一周课表、考试、作业和个人待办放在一起。使用 SwiftUI 构建，配套 WidgetKit 桌面小组件，支持本地数据保存与可扩展的内置模块。
 
-> 当前版本为早期开发版，主要界面语言为简体中文。提供未经 Apple 公证的 DMG 测试版，也可自行构建源码。本项目为个人项目，与南京信息工程大学或其他学校无官方隶属关系。
+> 当前版本为早期开发版，主要界面语言为简体中文。提供未经 Apple 公证的 macOS 安装包，也可自行构建源码。本项目为个人项目，与南京信息工程大学或其他学校无官方隶属关系。
 
 ## 下载与安装
 
-前往 [GitHub Releases](https://github.com/billow-css/CampusGo-Ultra/releases) 下载 **DMG 测试版**，支持 macOS 14+、Apple 芯片与 Intel Mac。打开后将应用拖入 Applications（应用程序）。DMG 内附有安装与首次打开教程，完整说明见 [安装指南](Docs/Installation.md)。
+前往 [GitHub Releases](https://github.com/billow-css/CampusGo-Ultra/releases) 下载 **macOS PKG 测试版**，支持 macOS 14+、Apple 芯片与 Intel Mac。双击 PKG，按提示将应用安装到“应用程序”。旧版 DMG 仍可从对应 Release 下载，完整说明见 [安装指南](Docs/Installation.md)。
 
 测试版采用临时签名，没有 Developer ID 签名与 Apple 公证。首次被系统阻止时，可在确认来源后按教程进入 **系统设置 → 隐私与安全性 → 仍要打开**。小组件跨设备共享数据访问尚未验证，可能需要自行配置签名和 App Group；此操作不会自动补齐这些能力。
 
@@ -34,7 +34,7 @@
 | 番茄钟 | 25 分钟专注、5 分钟休息，支持 1–12 轮循环、快捷轮数、预计总时长、暂停恢复、全窗口专注及可选常驻标签页 |
 | 窗口桌宠 | 自定义图片、拖动位置、大小调整、点击弹跳、长按蓄力和自定义台词；仅在应用窗口内显示 |
 | Agenda（Mac） | 草绿色时段计划页，M / A / N 三时段周历、八位 S 编号、子任务与进度、逾期顺延、未预定池；联动课表绿点与摘要卡片，详见 [使用说明](Docs/GoSci.md) |
-| Git（Mac） | 项目动态看板、真实提交分支图、本地近 84 天活跃度、工作区提示，以及公开 GitHub 仓库的 PR / Issue / CI；详见 [使用说明](Docs/Git.md) |
+| Git（Mac） | 项目动态看板、真实提交分支图、本地近 84 天活跃度、工作区提示，以及 GitHub 仓库的 PR / Issue / CI；详见 [使用说明](Docs/Git.md) |
 | 外观 | 跟随系统 / 浅色 / 深色模式，以及六种强调色 |
 | 标签页 | 设置中可显示或隐藏 Plans、Agenda、番茄钟、Git 及发现；摘要和课表固定显示，展开模块时可显示临时标签 |
 
@@ -117,17 +117,17 @@ Swift Package 仅包含可独立测试的核心逻辑，不构建整个 SwiftUI 
 
 上述测试和无签名编译可用于本地检查。系统授权、桌面小组件注册和完整鼠标交互仍需要在实际 Mac 环境中验证。
 
-## 制作 DMG 测试版
+## 制作 macOS 安装包
 
 在 macOS 上完成上面的通用无签名 Release 编译后，可运行：
 
 ```sh
-python3 Tools/package_dmg.py \
+python3 Tools/package_pkg.py \
   --app "DerivedData/Build/Products/Release/CampusGo Ultra.app" \
-  --output dist/CampusGo-Ultra-0.1.0-universal.dmg
+  --output dist/CampusGo-Ultra-0.1.1-universal.pkg
 ```
 
-构建时应指定 `ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO`。脚本检查双架构与私人图片排除，为主应用及扩展添加临时签名，生成包含 Applications 快捷入口、安装教程、LICENSE 和 NOTICE 的 DMG，并输出 SHA-256 校验文件。该过程不会进行 Apple 公证，也不授予跨设备共享组能力。
+构建时应指定 `ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO`。脚本检查双架构与私人图片排除，为主应用及扩展添加临时签名，生成带安装提示和许可证的 PKG，并输出 SHA-256 校验文件。也可用 `Tools/package_dmg.py` 制作 DMG。该过程不会进行 Apple 公证，也不授予跨设备共享组能力。
 
 ## 项目结构
 

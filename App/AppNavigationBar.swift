@@ -79,7 +79,7 @@ private struct NavigationItem: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
-                Image(systemName: selected && icon == "house" ? "house.fill" : icon)
+                ModuleIcon(name: selected && icon == "house" ? "house.fill" : icon, size: 15)
                 ScrollingTabTitle(title: title, selected: selected)
             }
                 .font(.system(size: 13, weight: selected ? .semibold : .regular))
