@@ -6,6 +6,8 @@ struct MultilineTextInput: View {
     @Binding var text: String
     let placeholder: String
     var height: CGFloat = 100
+    var surface: Color? = nil
+    var autoFocus = false
     @FocusState private var focused: Bool
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -18,7 +20,8 @@ struct MultilineTextInput: View {
                     .padding(.horizontal, 12).padding(.vertical, 13).allowsHitTesting(false)
             }
         }.frame(height: height)
-            .background(CampusTheme.board, in: RoundedRectangle(cornerRadius: 7))
+            .background(surface ?? CampusTheme.board, in: RoundedRectangle(cornerRadius: 7))
             .overlay { RoundedRectangle(cornerRadius: 7).strokeBorder(focused ? ink : CampusTheme.boardLine, lineWidth: 1) }
+            .onAppear { if autoFocus { focused = true } }
     }
 }

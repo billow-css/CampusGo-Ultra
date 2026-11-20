@@ -22,6 +22,13 @@ final class ModuleTests: XCTestCase {
         XCTAssertThrowsError(try ModuleRegistry([value]))
     }
     func testModuleNeedsPresentationSurface() { XCTAssertThrowsError(try ModuleRegistry([descriptor("mod.alpha", surfaces: [])])) }
+    func testNavigationEntryRequiresDetailAndSupportsFixedAccent() throws {
+        XCTAssertThrowsError(try ModuleRegistry([descriptor("mod.alpha", surfaces: [.navigation])]))
+        var value = descriptor("mod.alpha", surfaces: [.navigation, .detail, .calendarIndicator])
+        value.accent = .grass
+        let restored = try JSONDecoder().decode(ModuleDescriptor.self, from: JSONEncoder().encode(value))
+        XCTAssertEqual(try ModuleRegistry([restored]).descriptor("mod.alpha")?.accent, .grass)
+    }
     func testLayoutRemovesUnknownAndDuplicatePins() throws {
         let registry = try registry()
         var layout = ModuleLayout(enabled: ["mod.alpha": false, "gone": true], summaryOrder: ["mod.alpha", "gone", "mod.alpha", "mod.beta"])

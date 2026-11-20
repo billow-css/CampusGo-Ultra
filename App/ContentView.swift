@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 struct ContentView: View {
     @Environment(\.nuistAccent) private var themeAccent
     @EnvironmentObject private var store: AppStore
+    @EnvironmentObject private var manager: ModuleManager
     @Environment(\.scenePhase) private var scenePhase
     @State private var page = "schedule"
     @State private var activeModule = "campus.pomodoro"
@@ -16,9 +17,15 @@ struct ContentView: View {
     private func openModule(_ id: String, settings: Bool, origin: String) {
         activeModule = id; moduleSettings = settings; moduleOrigin = origin; page = "module"
     }
+    private var moduleReturnTitle: String {
+        if moduleOrigin == "home" { return "返回摘要" }
+        if moduleOrigin.hasPrefix("nav.") { return "返回" + manager.navigationTitle(for: String(moduleOrigin.dropFirst(4))) }
+        return "返回发现"
+    }
     var body: some View {
         VStack(spacing: 0) {
-            AppNavigationBar(page: $page, moduleOrigin: moduleOrigin) { showingSettings = true }
+            AppNavigationBar(page: $page, moduleOrigin: moduleOrigin,
+                expandedModuleID: page == "module" && !moduleSettings ? activeModule : nil) { showingSettings = true }
             if store.snapshot.settings.calendarIDs.isEmpty && !store.isDemo {
                 HStack(spacing: 12) {
                     Image(systemName: "calendar.badge.plus")
@@ -30,9 +37,12 @@ struct ContentView: View {
             }
             if page == "module" {
                 ModulePage(id: activeModule, showingSettings: moduleSettings,
-                    returnTitle: moduleOrigin == "home" ? "返回摘要" : "返回发现",
+                    returnTitle: moduleReturnTitle,
                     onOpen: { id, settings in openModule(id, settings: settings, origin: moduleOrigin) },
                     onBack: { page = moduleOrigin })
+            } else if page.hasPrefix("nav.") {
+                ModulePage(id: String(page.dropFirst(4)), showingSettings: false, returnTitle: "返回课表",
+                    onOpen: { id, settings in openModule(id, settings: settings, origin: page) }, onBack: { page = "schedule" })
             } else if page == "work" {
                 WorkOverviewPage()
             } else if page == "discover" {
@@ -80,6 +90,12 @@ struct ContentView: View {
             } message: { Text(store.errorMessage ?? "") }
             .task { store.reloadWidgets(); await store.connectIfAuthorized() }
             .onOpenURL { url in if url.host == "today" { page = "schedule"; weekOffset = 0 } }
+            .onChange(of: manager.layout) { _, _ in
+                if page.hasPrefix("nav."), !manager.isEnabled(String(page.dropFirst(4))) { page = "schedule" }
+            }
+            .onChange(of: manager.navigation) { _, navigation in
+                page = navigation.resolvedPage(page, moduleOrigin: moduleOrigin)
+            }
             .onReceive(refreshTimer) { _ in Task { await store.connectIfAuthorized() } }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { Task { await store.connectIfAuthorized() } }
