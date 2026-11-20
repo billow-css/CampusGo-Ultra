@@ -32,7 +32,7 @@
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
-	<string>25</string>
+	<string>30</string>
 	<key>CampusAppGroup</key>
 	<string>$(NUISTGO_APP_GROUP)</string>
 	<key>LSMinimumSystemVersion</key>

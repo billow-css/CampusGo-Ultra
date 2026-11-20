@@ -254,14 +254,16 @@ final class ModuleHostState: ObservableObject {
     let pet: WindowPetStore
     let sci: GoSciStore
     let git: GitStore
+    let tcp: TCPBrowser
     let manager: ModuleManager
     init(defaults: UserDefaults = .standard) {
         let timer = PomodoroStore(defaults: defaults)
         let pet = WindowPetStore(defaults: defaults)
         let sci = GoSciStore(defaults: defaults)
         let git = GitStore(defaults: defaults)
-        self.timer = timer; self.pet = pet; self.sci = sci; self.git = git
+        let tcp = TCPBrowser(defaults: defaults)
+        self.timer = timer; self.pet = pet; self.sci = sci; self.git = git; self.tcp = tcp
         // Built-ins use the same versioned registration path as future internal modules.
-        manager = try! ModuleManager(modules: [PomodoroModule(timer: timer), PetModule(pet: pet), GoSciModule(planner: sci), GitModule(git: git)], defaults: defaults)
+        manager = try! ModuleManager(modules: [PomodoroModule(timer: timer), PetModule(pet: pet), GoSciModule(planner: sci), GitModule(git: git), TCPModule(browser: tcp)], defaults: defaults)
     }
 }

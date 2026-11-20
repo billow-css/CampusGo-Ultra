@@ -16,7 +16,8 @@ struct GitPage: View {
     @EnvironmentObject private var git: GitStore
     @State private var addSheet = false
     @State private var repositoryURL = ""
-    @State private var showPreview = false
+    @State private var previewNode: GitGraphNode?
+    @State private var remoteTarget: GitHubDetailTarget?
     @State private var showGitHubAccess = false
     @State private var section = "graph"
     private let ticker = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
@@ -57,11 +58,16 @@ struct GitPage: View {
             }
         }.background(Color(nsColor: .windowBackgroundColor)).tint(GitTheme.accent)
             .onAppear { git.refreshIfDue() }
-            .onReceive(ticker) { _ in if NSApp.isActive { git.refreshIfDue() } }
-            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in git.refreshIfDue() }
+            .onReceive(ticker) { _ in if NSApp.isActive && previewNode == nil && remoteTarget == nil { git.refreshIfDue() } }
+            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in if previewNode == nil && remoteTarget == nil { git.refreshIfDue() } }
             .onChange(of: git.selectedID) { _, _ in section = "graph" }
             .sheet(isPresented: $addSheet) { addProject }
-            .sheet(isPresented: $showPreview) { preview }
+            .sheet(item: $previewNode, onDismiss: git.closeCommitDetail) { node in
+                GitCommitDetailView(node: node) { previewNode = nil }
+            }
+            .sheet(item: $remoteTarget) { target in
+                GitRemoteDetailView(target: target) { remoteTarget = nil }
+            }
             .sheet(isPresented: $showGitHubAccess) {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("GitHub 访问设置").font(.title2.bold())
@@ -145,7 +151,7 @@ struct GitPage: View {
             ForEach(rows) { row in
                 Button {
                     git.openCommit(row.node)
-                    if git.selected?.github == nil { showPreview = true }
+                    previewNode = row.node
                 } label: {
                     HStack(spacing: 12) {
                         GitGraphRail(row: row).frame(width: 100, height: 60)
@@ -171,20 +177,36 @@ struct GitPage: View {
             if let hub = git.hub {
                 Text("最近 CI 运行").font(.headline)
                 ForEach(hub.runs) { run in
-                    Link(destination: run.html_url) { HStack { Image(systemName: run.failed ? "xmark.circle.fill" : run.conclusion == "success" ? "checkmark.circle.fill" : "clock").foregroundStyle(run.failed ? Color.red : .green); Text(run.name ?? "Workflow"); Spacer(); Text(run.conclusion ?? run.status).foregroundStyle(.secondary) } }.buttonStyle(.plain)
+                    Button { remoteTarget = .run(run) } label: {
+                        HStack {
+                            Image(systemName: run.failed ? "xmark.circle.fill" : run.conclusion == "success" ? "checkmark.circle.fill" : "clock")
+                                .foregroundStyle(run.failed ? Color.red : .green)
+                            Text(run.name ?? "Workflow")
+                            Spacer()
+                            Text(run.conclusion ?? run.status).foregroundStyle(.secondary)
+                            Image(systemName: "chevron.right").foregroundStyle(.tertiary)
+                        }.contentShape(Rectangle())
+                    }.buttonStyle(.plain).disabled(git.busy)
                 }
                 if hub.runs.isEmpty { Text("暂无可用运行记录").foregroundStyle(.secondary) }
                 Divider(); Text("最近开放 PR").font(.headline)
-                ForEach(hub.pulls) { item in itemLink(item) }
+                ForEach(hub.pulls) { item in itemRow(item, target: .pull(item)) }
                 if hub.pulls.isEmpty { Text("暂无可用 PR").foregroundStyle(.secondary) }
                 Divider(); Text("最近开放 Issue").font(.headline)
-                ForEach(hub.issues) { item in itemLink(item) }
+                ForEach(hub.issues) { item in itemRow(item, target: .issue(item)) }
                 if hub.issues.isEmpty { Text("暂无可用 Issue").foregroundStyle(.secondary) }
             } else { Text("刷新后显示 GitHub 项目动态").foregroundStyle(.secondary) }
         }.font(.system(size: 12)).padding(22).frame(maxWidth: .infinity, alignment: .leading).gitPanel()
     }
-    private func itemLink(_ item: GitHubItem) -> some View {
-        Link(destination: item.html_url) { HStack { Text("#\(item.number)").foregroundStyle(GitTheme.accent); Text(item.title).lineLimit(2); Spacer(); Image(systemName: "arrow.up.right").foregroundStyle(.secondary) } }.buttonStyle(.plain)
+    private func itemRow(_ item: GitHubItem, target: GitHubDetailTarget) -> some View {
+        Button { remoteTarget = target } label: {
+            HStack {
+                Text("#\(item.number)").foregroundStyle(GitTheme.accent)
+                Text(item.title).lineLimit(2)
+                Spacer()
+                Image(systemName: "chevron.right").foregroundStyle(.tertiary)
+            }.contentShape(Rectangle())
+        }.buttonStyle(.plain).disabled(git.busy)
     }
     private var workspace: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -202,14 +224,305 @@ struct GitPage: View {
             HStack { Button("选择本地项目…") { addSheet = false; git.addRepository() }; Spacer(); Button("取消") { addSheet = false }; Button("关注") { git.addGitHub(repositoryURL); addSheet = false }.buttonStyle(.borderedProminent).disabled(GitHubActivityService.identifier(repositoryURL) == nil) }
         }.padding(25).frame(width: 500)
     }
-    private var preview: some View {
-        VStack {
-            HStack { Text("提交详情").font(.headline); Spacer(); Button("关闭") { showPreview = false } }.padding()
-            if git.previewLoading { ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity) }
-            else { ScrollView([.horizontal, .vertical]) { Text(git.preview).font(.system(size: 11, design: .monospaced)).textSelection(.enabled).padding().frame(maxWidth: .infinity, alignment: .leading) } }
-        }.frame(width: 850, height: 560)
+}
+
+private struct GitCommitDetailView: View {
+    @EnvironmentObject private var git: GitStore
+    let node: GitGraphNode
+    let close: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Label { Text("提交详情") } icon: { ModuleIcon(name: ModuleIcon.gitBranch, size: 14) }
+                        .font(.caption.weight(.semibold)).foregroundStyle(.orange)
+                    Spacer()
+                    Button("关闭", action: close).keyboardShortcut(.cancelAction)
+                }
+                Text(node.subject).font(.title2.weight(.semibold)).lineLimit(2).textSelection(.enabled)
+                HStack(spacing: 12) {
+                    Text(String(node.id.prefix(12))).font(.system(.caption, design: .monospaced))
+                        .padding(5).background(.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 4))
+                    Text(node.author)
+                    Text(node.date.formatted(date: .abbreviated, time: .shortened))
+                }.font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+            }.padding(20).background(CampusTheme.board)
+            Divider()
+            if git.previewLoading {
+                ProgressView("正在读取提交…").frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let error = git.commitDetailError {
+                ContentUnavailableView {
+                    Label("无法读取提交", systemImage: "exclamationmark.triangle")
+                } description: {
+                    Text(error)
+                } actions: {
+                    Button("重试") { git.openCommit(node) }
+                }
+            } else if let detail = git.commitDetail {
+                detailBody(detail)
+            }
+        }.frame(width: 860, height: 580)
+    }
+
+    private func detailBody(_ detail: GitCommitDetail) -> some View {
+        let messageBody = detail.message.split(separator: "\n", maxSplits: 1).dropFirst().first
+        return VStack(spacing: 0) {
+            if let messageBody, !messageBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                ScrollView { Text(messageBody).font(.callout).textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(14) }
+                    .frame(maxHeight: 105)
+                Divider()
+            }
+            GitChangedFilesView(files: detail.files, note: detail.note)
+        }
     }
 }
+
+private struct GitChangedFilesView: View {
+    let files: [GitCommitDetail.File]
+    var note: String?
+    @State private var selectedFile = 0
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    Text("改动文件 · \(files.count)").font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary).padding(8)
+                    if let note = note { Text(note).font(.caption).foregroundStyle(.secondary).padding(8) }
+                    ForEach(files.indices, id: \.self) { index in
+                        let file = files[index]
+                        Button { selectedFile = index } label: {
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(file.filename).font(.caption).lineLimit(2).truncationMode(.middle)
+                                if let added = file.additions, let removed = file.deletions {
+                                    HStack(spacing: 8) {
+                                        Text("+\(added)").foregroundStyle(.green)
+                                        Text("−\(removed)").foregroundStyle(.red)
+                                    }.font(.system(.caption2, design: .monospaced))
+                                }
+                            }.frame(maxWidth: .infinity, alignment: .leading).padding(8)
+                                .background(selectedFile == index ? Color.orange.opacity(0.12) : .clear,
+                                            in: RoundedRectangle(cornerRadius: 6))
+                                .contentShape(Rectangle())
+                        }.buttonStyle(.plain).help(file.filename)
+                    }
+                }.padding(10)
+            }.frame(width: 240)
+            Divider()
+            if files.indices.contains(selectedFile) {
+                diffView(files[selectedFile]).id(selectedFile)
+            } else {
+                ContentUnavailableView("无文件变更", systemImage: "doc.text")
+            }
+        }
+    }
+
+    private func diffView(_ file: GitCommitDetail.File) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(file.filename).font(.caption.weight(.medium)).textSelection(.enabled)
+                .padding(12)
+            Divider()
+            if let patch = file.patch, !patch.isEmpty {
+                let lines = patch.prefix(200_000).split(separator: "\n", omittingEmptySubsequences: false)
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(lines.indices, id: \.self) { index in
+                            let line = lines[index]
+                            let color: Color = line.hasPrefix("+") ? .green : line.hasPrefix("-") ? .red : line.hasPrefix("@@") ? .blue : .clear
+                            Text(line.isEmpty ? " " : String(line))
+                                .font(.system(size: 11, design: .monospaced))
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 10).padding(.vertical, 2)
+                                .background(color.opacity(0.12))
+                        }
+                        if patch.count > 200_000 { Text("此文件的差异预览已截断").padding(10).foregroundStyle(.secondary) }
+                    }
+                }
+            } else {
+                ContentUnavailableView("无文本差异", systemImage: "doc.text",
+                                       description: Text("二进制文件或没有可显示的补丁。"))
+            }
+        }.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
+private struct GitRemoteDetailView: View {
+    @EnvironmentObject private var git: GitStore
+    @State private var detail: GitHubRemoteDetail?
+    @State private var error: String?
+    @State private var retry = 0
+    @State private var pane = "conversation"
+    let target: GitHubDetailTarget
+    let close: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Label { Text(target.label) } icon: { ModuleIcon(name: ModuleIcon.gitBranch, size: 14) }
+                        .font(.caption.weight(.semibold)).foregroundStyle(.orange)
+                    Spacer()
+                    Button("关闭", action: close).keyboardShortcut(.cancelAction)
+                }
+                Text(target.title).font(.title2.weight(.semibold)).lineLimit(2).textSelection(.enabled)
+                if let repository = git.selected?.github {
+                    Text(repository).font(.caption).foregroundStyle(.secondary)
+                }
+            }.padding(20).frame(maxWidth: .infinity, alignment: .leading).background(CampusTheme.board)
+            Divider()
+            if let detail {
+                switch detail {
+                case .discussion(let discussion, let comments, let files, let warnings):
+                    discussionBody(discussion, comments: comments, files: files, warnings: warnings)
+                case .run(let run, let jobs, let total):
+                    runBody(run, jobs: jobs, total: total)
+                }
+            } else if let error {
+                ContentUnavailableView {
+                    Label("无法读取详情", systemImage: "exclamationmark.triangle")
+                } description: {
+                    Text(error)
+                } actions: {
+                    Button("重试") { retry += 1 }
+                }
+            } else {
+                ProgressView("正在读取详情…").frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }.frame(width: 860, height: 580)
+            .task(id: retry) {
+                error = nil
+                do { detail = try await git.remoteDetail(target) }
+                catch { if !Task.isCancelled { self.error = error.localizedDescription } }
+            }
+    }
+
+    private func discussionBody(_ discussion: GitHubDiscussion, comments: [GitHubComment]?,
+                                files: [GitCommitDetail.File]?, warnings: [String]) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 14) {
+                let isMerged = discussion.merged == true
+                let isOpen = discussion.state == "open"
+                let status = isMerged ? "已合并" : !isOpen ? "已关闭" : discussion.draft == true ? "草稿" : "开放"
+                badge(status, color: isMerged ? .purple : isOpen ? .green : .secondary)
+                if let source = discussion.head?.ref, let destination = discussion.base?.ref {
+                    Text(source + " → " + destination).font(.system(.caption, design: .monospaced))
+                        .lineLimit(1).truncationMode(.middle)
+                }
+                Spacer()
+                if let files {
+                    Picker("显示", selection: $pane) {
+                        Text("讨论").tag("conversation")
+                        Text("文件 · \(files.count)").tag("files")
+                    }.pickerStyle(.segmented).labelsHidden().frame(width: 200)
+                }
+            }.padding(12)
+            Divider()
+            if pane == "files", let files {
+                GitChangedFilesView(files: files, note: files.count == 100 ? "仅预览前 100 个改动文件。" : nil)
+            } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 12) {
+                        ForEach(warnings, id: \.self) { warning in
+                            Label(warning, systemImage: "exclamationmark.triangle")
+                                .font(.caption).foregroundStyle(.orange)
+                        }
+                        post(author: discussion.user?.login, date: discussion.created_at,
+                             body: discussion.body ?? "未填写说明。")
+                        if let comments {
+                            Text("评论 · \(discussion.comments ?? comments.count)").font(.headline)
+                            if (discussion.comments ?? comments.count) > comments.count {
+                                Text("显示前 \(comments.count) 条评论。").font(.caption).foregroundStyle(.secondary)
+                            }
+                            if comments.isEmpty { Text("暂无评论").font(.caption).foregroundStyle(.secondary) }
+                            ForEach(comments) { post(author: $0.user?.login, date: $0.created_at, body: $0.body) }
+                        }
+                    }.padding(16)
+                }
+            }
+        }
+    }
+
+    private func post(author: String?, date: String?, body: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label(author ?? "未知作者", systemImage: "person.crop.circle").font(.callout.weight(.semibold))
+                Spacer()
+                dateLabel(date)
+            }
+            let excerpt = String(body.prefix(30_000))
+            Text((try? AttributedString(markdown: excerpt, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
+                 ?? AttributedString(excerpt))
+                .font(.callout).textSelection(.enabled)
+                .environment(\.openURL, OpenURLAction { _ in .discarded })
+            if body.count > 30_000 { Text("内容已截断").font(.caption).foregroundStyle(.secondary) }
+        }.padding(14).frame(maxWidth: .infinity, alignment: .leading).gitPanel()
+    }
+
+    private func runBody(_ run: GitHubRun, jobs: [GitHubJob], total: Int) -> some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 12) {
+                    runStatus(run.status, run.conclusion)
+                    if let branch = run.head_branch { Label(branch, systemImage: "arrow.triangle.branch") }
+                    if let event = run.event { Text(event) }
+                    if let attempt = run.run_attempt { Text("第 \(attempt) 次运行") }
+                    Spacer()
+                    dateLabel(run.created_at)
+                }.font(.caption).padding(14).gitPanel()
+                Text("任务 · \(total)").font(.headline)
+                if jobs.isEmpty { Text("暂无任务").foregroundStyle(.secondary) }
+                if total > jobs.count {
+                    Text("显示前 \(jobs.count) 个任务。").font(.caption).foregroundStyle(.secondary)
+                }
+                ForEach(jobs) { job in
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack { Text(job.name).font(.callout.weight(.semibold)); Spacer(); runStatus(job.status, job.conclusion) }
+                        ForEach(job.steps ?? []) { step in
+                            Divider()
+                            HStack {
+                                Text("\(step.number)").font(.caption.monospacedDigit()).foregroundStyle(.secondary).frame(minWidth: 20)
+                                Text(step.name).font(.callout)
+                                Spacer()
+                                runStatus(step.status, step.conclusion)
+                            }
+                        }
+                    }.padding(14).gitPanel()
+                }
+            }.padding(16)
+        }
+    }
+
+    @ViewBuilder private func dateLabel(_ date: String?) -> some View {
+        if let date, let value = try? Date(date, strategy: .iso8601) {
+            Text(value.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    private func runStatus(_ status: String, _ conclusion: String?) -> some View {
+        let value = conclusion ?? status
+        switch value {
+        case "success": return badge("成功", color: .green)
+        case "failure": return badge("失败", color: .red)
+        case "timed_out": return badge("超时", color: .red)
+        case "action_required": return badge("等待处理", color: .orange)
+        case "cancelled": return badge("已取消", color: .secondary)
+        case "skipped": return badge("已跳过", color: .secondary)
+        case "queued", "waiting", "pending", "requested": return badge("等待中", color: .secondary)
+        case "in_progress": return badge("运行中", color: .orange)
+        case "completed": return badge("已完成", color: .secondary)
+        default: return badge(value, color: .secondary)
+        }
+    }
+
+    private func badge(_ text: String, color: Color) -> some View {
+        Text(text).font(.caption.weight(.medium)).foregroundStyle(color)
+            .padding(.horizontal, 8).padding(.vertical, 4).background(color.opacity(0.12), in: Capsule())
+    }
+}
+
 private extension View {
     func gitPanel() -> some View { background(CampusTheme.board, in: RoundedRectangle(cornerRadius: 13)).overlay { RoundedRectangle(cornerRadius: 13).strokeBorder(CampusTheme.boardLine) } }
 }

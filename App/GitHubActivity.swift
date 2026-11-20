@@ -9,6 +9,19 @@ struct GitGraphNode: Identifiable {
     let date: Date
     let refs: String
 }
+struct GitCommitDetail {
+    let message: String
+    let files: [File]
+    var note: String? = nil
+
+    struct File: Decodable {
+        let filename: String
+        let patch: String?
+        let status: String?
+        let additions: Int?
+        let deletions: Int?
+    }
+}
 struct GitHubItem: Decodable, Identifiable {
     let id: Int
     let title: String
@@ -23,8 +36,81 @@ struct GitHubRun: Decodable, Identifiable {
     let status: String
     let conclusion: String?
     let html_url: URL
+    let head_branch: String?
+    let run_attempt: Int?
+    let event: String?
+    let created_at: String?
     var failed: Bool { ["failure", "timed_out", "action_required"].contains(conclusion ?? "") }
 }
+enum GitHubDetailTarget: Identifiable {
+    case pull(GitHubItem)
+    case issue(GitHubItem)
+    case run(GitHubRun)
+
+    var id: String {
+        switch self {
+        case .pull(let item): return "pr-\(item.number)"
+        case .issue(let item): return "issue-\(item.number)"
+        case .run(let run): return "ci-\(run.id)"
+        }
+    }
+    var title: String {
+        switch self {
+        case .pull(let item), .issue(let item): return item.title
+        case .run(let run): return run.name ?? "Workflow"
+        }
+    }
+    var label: String {
+        switch self {
+        case .pull(let item): return "PR #\(item.number)"
+        case .issue(let item): return "Issue #\(item.number)"
+        case .run(let run): return "CI · \(run.id)"
+        }
+    }
+}
+
+struct GitHubDiscussion: Decodable {
+    struct User: Decodable { let login: String }
+    struct Branch: Decodable { let ref: String }
+    let title: String
+    let body: String?
+    let state: String
+    let user: User?
+    let created_at: String?
+    let comments: Int?
+    let draft: Bool?
+    let merged: Bool?
+    let head: Branch?
+    let base: Branch?
+}
+
+struct GitHubComment: Decodable, Identifiable {
+    let id: Int
+    let user: GitHubDiscussion.User?
+    let body: String
+    let created_at: String?
+}
+
+struct GitHubJob: Decodable, Identifiable {
+    struct Step: Decodable, Identifiable {
+        let number: Int
+        let name: String
+        let status: String
+        let conclusion: String?
+        var id: Int { number }
+    }
+    let id: Int
+    let name: String
+    let status: String
+    let conclusion: String?
+    let steps: [Step]?
+}
+
+enum GitHubRemoteDetail {
+    case discussion(GitHubDiscussion, comments: [GitHubComment]?, files: [GitCommitDetail.File]?, warnings: [String])
+    case run(GitHubRun, jobs: [GitHubJob], totalJobs: Int)
+}
+
 struct GitHubActivity {
     var description = ""
     var nodes: [GitGraphNode] = []
@@ -45,12 +131,67 @@ actor GitHubActivityService {
     private let session = URLSession(configuration: .ephemeral, delegate: GitHubRedirectPolicy(), delegateQueue: nil)
 
     func load(_ id: String, token: String?, previous: GitHubActivity?) async throws -> GitHubActivity {
+        configureToken(token)
+        return try await load(id, previous: previous)
+    }
+
+    private func configureToken(_ token: String?) {
         if self.token != token {
             self.token = token
             cache.removeAll()
             retryAt = nil
         }
-        return try await load(id, previous: previous)
+    }
+
+    func commitDetail(repo: String, sha: String, token: String?) async throws -> GitCommitDetail {
+        struct Response: Decodable {
+            struct Commit: Decodable { let message: String }
+            let commit: Commit
+            let files: [GitCommitDetail.File]?
+        }
+        guard Self.identifier(repo) == repo, sha.count == 40,
+              sha.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) }) else {
+            throw GitFailure(message: "提交地址无效。")
+        }
+        configureToken(token)
+        let result = try await get(repo + "/commits/" + sha + "?per_page=100", as: Response.self)
+        let files = result.files ?? []
+        return GitCommitDetail(message: result.commit.message, files: files,
+                               note: files.count == 100 ? "大型提交仅预览前 100 个改动文件。" : nil)
+    }
+
+    func remoteDetail(repo: String, target: GitHubDetailTarget, token: String?) async throws -> GitHubRemoteDetail {
+        guard Self.identifier(repo) == repo else { throw GitFailure(message: "GitHub 仓库名称无效。") }
+        configureToken(token)
+        switch target {
+        case .pull(let item):
+            return try await discussion(repo: repo, number: item.number, pull: true)
+        case .issue(let item):
+            return try await discussion(repo: repo, number: item.number, pull: false)
+        case .run(let run):
+            struct Jobs: Decodable { let jobs: [GitHubJob]; let total_count: Int }
+            let path = repo + "/actions/runs/\(run.id)"
+            let current = try await get(path, as: GitHubRun.self)
+            let attempt = current.run_attempt.map { "/attempts/\($0)" } ?? ""
+            let jobs = try await get(path + attempt + "/jobs?per_page=100", as: Jobs.self)
+            return .run(current, jobs: jobs.jobs, totalJobs: jobs.total_count)
+        }
+    }
+
+    private func discussion(repo: String, number: Int, pull: Bool) async throws -> GitHubRemoteDetail {
+        let issuePath = repo + "/issues/\(number)"
+        let pullPath = repo + "/pulls/\(number)"
+        let discussion = try await get(pull ? pullPath : issuePath, as: GitHubDiscussion.self)
+        var warnings: [String] = []
+        let comments: [GitHubComment]? = try await section("评论", warnings: &warnings, fallback: nil) {
+            try await get(issuePath + "/comments?per_page=30", as: [GitHubComment].self)
+        }
+        let files: [GitCommitDetail.File]? = if pull {
+            try await section("改动文件", warnings: &warnings, fallback: nil) {
+                try await get(pullPath + "/files?per_page=100", as: [GitCommitDetail.File].self)
+            }
+        } else { nil }
+        return .discussion(discussion, comments: comments, files: files, warnings: warnings)
     }
 
     static func identifier(_ input: String) -> String? {

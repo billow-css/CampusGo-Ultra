@@ -9,7 +9,8 @@ final class GitStore: ObservableObject {
     @Published private(set) var busy = false
     @Published private(set) var activity = ""
     @Published private(set) var refreshedAt: Date?
-    @Published private(set) var preview = ""
+    @Published private(set) var commitDetail: GitCommitDetail?
+    @Published private(set) var commitDetailError: String?
     @Published private(set) var previewLoading = false
     @Published private(set) var selectedFile: String?
     @Published private(set) var selectedCommit: String?
@@ -76,7 +77,7 @@ final class GitStore: ObservableObject {
     func select(_ id: UUID) {
         guard !busy, selectedID != id else { return }
         cancel(); hub = nil; selectedID = id; snapshot = GitSnapshot(); refreshedAt = nil
-        selectedFile = nil; selectedCommit = nil; preview = ""; commitMessage = ""; notice = nil
+        selectedFile = nil; selectedCommit = nil; commitDetail = nil; commitMessage = ""; notice = nil
         restoreRemoteSnapshot(); persist(); refreshIfDue()
     }
     func addRepository() {
@@ -100,7 +101,7 @@ final class GitStore: ObservableObject {
             try Task.checkCancellation()
             if existing == nil { repositories.append(repo) }
             selectedID = repo.id; hub = nil; snapshot = state; refreshedAt = .now
-            selectedFile = nil; selectedCommit = nil; preview = ""; commitMessage = ""
+            selectedFile = nil; selectedCommit = nil; commitDetail = nil; commitMessage = ""
             persist(); notice = "已添加 \(repo.name)"
         }
     }
@@ -110,7 +111,7 @@ final class GitStore: ObservableObject {
         remoteSnapshots.removeValue(forKey: selectedID)
         lastRemoteAttempt.removeValue(forKey: selectedID)
         self.selectedID = repositories.first?.id; hub = nil; snapshot = GitSnapshot(); refreshedAt = nil
-        selectedFile = nil; selectedCommit = nil; preview = ""; commitMessage = ""
+        selectedFile = nil; selectedCommit = nil; commitDetail = nil; commitMessage = ""
         restoreRemoteSnapshot(); persist(); notice = "已从列表移除，仓库文件保留。"; refreshIfDue()
     }
     private func start(_ title: String, body: @escaping @MainActor () async throws -> Void) {
@@ -191,7 +192,7 @@ final class GitStore: ObservableObject {
             let result = try await GitService.snapshot(at: url)
             try Task.checkCancellation()
             snapshot = result; refreshedAt = .now
-            if !result.files.contains(where: { $0.path == selectedFile }) { selectedFile = nil; preview = "" }
+            if !result.files.contains(where: { $0.path == selectedFile }) { selectedFile = nil; commitDetail = nil }
             if let file = currentFile, stagedPreview && !file.staged { stagedPreview = false }
         }
     }
@@ -200,23 +201,57 @@ final class GitStore: ObservableObject {
         if let id = selected?.github, let url = URL(string: "https://github.com/" + id) { NSWorkspace.shared.open(url) }
         else if let repo = selected, let url = try? resolve(repo) { NSWorkspace.shared.activateFileViewerSelecting([url]) }
     }
-    func openCommit(_ node: GitGraphNode) {
-        if let id = selected?.github, let url = URL(string: "https://github.com/" + id + "/commit/" + node.id) { NSWorkspace.shared.open(url) }
-        else { previewCommit(node) }
+    func remoteDetail(_ target: GitHubDetailTarget) async throws -> GitHubRemoteDetail {
+        guard let repo = selected?.github else { throw GitFailure(message: "请选择 GitHub 项目。") }
+        let token = try await Task.detached { try GitHubTokenKeychain.load() }.value
+        try Task.checkCancellation()
+        return try await github.remoteDetail(repo: repo, target: target, token: token)
     }
-    private func previewCommit(_ node: GitGraphNode) {
+
+    func closeCommitDetail() {
+        previewTask?.cancel()
+        previewTask = nil
+        previewGeneration = UUID()
+        previewLoading = false
+        commitDetail = nil
+        commitDetailError = nil
+    }
+
+    func openCommit(_ node: GitGraphNode) {
         guard !busy, let repo = selected else { return }
-        previewTask?.cancel(); let token = UUID(); previewGeneration = token
-        selectedCommit = node.id; previewLoading = true; preview = ""
+        closeCommitDetail()
+        let generation = previewGeneration
+        previewLoading = true
         previewTask = Task {
             do {
-                let url = try resolve(repo); let access = url.startAccessingSecurityScopedResource()
-                defer { if access { url.stopAccessingSecurityScopedResource() } }
-                let result = try await GitService.run(["show", "--format=fuller", "--stat", "--patch", "--no-ext-diff", "--no-textconv", node.id, "--"], at: url).checked()
-                guard previewGeneration == token else { return }
-                preview = result.text
-            } catch { if previewGeneration == token { preview = error.localizedDescription } }
-            if previewGeneration == token { previewLoading = false }
+                let detail: GitCommitDetail
+                if let id = repo.github {
+                    let token = try await Task.detached { try GitHubTokenKeychain.load() }.value
+                    try Task.checkCancellation()
+                    detail = try await github.commitDetail(repo: id, sha: node.id, token: token)
+                } else {
+                    let url = try resolve(repo)
+                    let access = url.startAccessingSecurityScopedResource()
+                    defer { if access { url.stopAccessingSecurityScopedResource() } }
+                    let message = try await GitService.run(["show", "-s", "--format=%B", node.id, "--"], at: url).checked()
+                    let patch = try await GitService.run(["show", "--format=", "--diff-merges=first-parent", "--patch", "--no-ext-diff", "--no-textconv", "--no-color", node.id, "--"], at: url).checked()
+                    let files = patch.text.components(separatedBy: "\ndiff --git ").compactMap { section -> GitCommitDetail.File? in
+                        guard !section.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+                        let parts = section.split(separator: "\n", maxSplits: 1).map(String.init)
+                        guard let heading = parts.first else { return nil }
+                        let name = heading.hasPrefix("diff --git ") ? String(heading.dropFirst(11)) : heading
+                        return .init(filename: name, patch: parts.count == 2 ? parts[1] : nil,
+                                     status: nil, additions: nil, deletions: nil)
+                    }
+                    detail = .init(message: message.text, files: files)
+                }
+                guard previewGeneration == generation, !Task.isCancelled else { return }
+                commitDetail = detail
+            } catch {
+                guard previewGeneration == generation, !Task.isCancelled else { return }
+                commitDetailError = error.localizedDescription
+            }
+            if previewGeneration == generation { previewLoading = false }
         }
     }
 }

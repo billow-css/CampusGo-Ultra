@@ -149,6 +149,12 @@
 			"path" = "App/SmartDatePicker.swift";
 			"sourceTree" = "<group>";
 		};
+		"969D2974ECD6668C9BCE49D1" = {
+			"isa" = "PBXFileReference";
+			"lastKnownFileType" = "sourcecode.swift";
+			"path" = "App/TCPBrowser.swift";
+			"sourceTree" = "<group>";
+		};
 		"1C49E7E81C2B6EE592DAFB02" = {
 			"isa" = "PBXFileReference";
 			"lastKnownFileType" = "sourcecode.swift";
@@ -207,6 +213,7 @@
 				"05E29FD7F2E857812912DA6A",
 				"E56E49BA23317991582BFD23",
 				"743EBF837AC9146678AAD97F",
+				"969D2974ECD6668C9BCE49D1",
 				"1C49E7E81C2B6EE592DAFB02",
 				"7CC9625CCE9AB7919CFAFBB2",
 				"E3583BC2AC530FA5F627D457",
@@ -418,6 +425,13 @@
 			"path" = "System/Library/Frameworks/WidgetKit.framework";
 			"sourceTree" = "SDKROOT";
 		};
+		"1170B863C1496C38586E3377" = {
+			"isa" = "PBXFileReference";
+			"lastKnownFileType" = "wrapper.framework";
+			"name" = "WebKit.framework";
+			"path" = "System/Library/Frameworks/WebKit.framework";
+			"sourceTree" = "SDKROOT";
+		};
 		"ED2F3B048716C9DC7573911C" = {
 			"isa" = "PBXGroup";
 			"name" = "Frameworks";
@@ -425,6 +439,7 @@
 				"12A4B3D6AC4FAB9D19A11202",
 				"DDAE7857BF1961691ADEB477",
 				"826B0517F094852F30BAF771",
+				"1170B863C1496C38586E3377",
 			);
 			"sourceTree" = "<group>";
 		};
@@ -833,6 +848,10 @@
 			"isa" = "PBXBuildFile";
 			"fileRef" = "743EBF837AC9146678AAD97F";
 		};
+		"B51B67BF0AE4A79618FCF262" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "969D2974ECD6668C9BCE49D1";
+		};
 		"C294E3E790838587307C1FEB" = {
 			"isa" = "PBXBuildFile";
 			"fileRef" = "1C49E7E81C2B6EE592DAFB02";
@@ -945,6 +964,7 @@
 				"48B1A60F36D80A4A013C0171",
 				"89A122E4690163DC8F255DEF",
 				"9431976472214CD9E502589A",
+				"B51B67BF0AE4A79618FCF262",
 				"C294E3E790838587307C1FEB",
 				"9910AE5D33D53847C7983465",
 				"96FA58100CCF25074AC796A6",
@@ -981,6 +1001,10 @@
 			"isa" = "PBXBuildFile";
 			"fileRef" = "DDAE7857BF1961691ADEB477";
 		};
+		"CD2F1B34093DF7A0898F18AC" = {
+			"isa" = "PBXBuildFile";
+			"fileRef" = "1170B863C1496C38586E3377";
+		};
 		"3D6D11096F771EE88C3F1F54" = {
 			"isa" = "PBXFrameworksBuildPhase";
 			"buildActionMask" = 2147483647;
@@ -988,6 +1012,7 @@
 				"9AF8A52196F3002516266C82",
 				"8D22316DF7FCA3AF229900E8",
 				"FAD8A8799A1E7C59E408BD39",
+				"CD2F1B34093DF7A0898F18AC",
 			);
 			"runOnlyForDeploymentPostprocessing" = 0;
 		};
