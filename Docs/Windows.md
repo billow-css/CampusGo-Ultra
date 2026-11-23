@@ -1,77 +1,62 @@
-# Windows / Codex 构建交接
+# CampusGo Ultra Windows 开发指南
 
-Windows 版代码在 `Desktop/`，使用 Tauri 2 + Rust + React/TypeScript。根目录的 SwiftUI 工程仍为 Mac 版；请勿用它构建 Windows。
+从仓库 `main` 开始。Windows 界面使用 `Desktop/` 中的 React、TypeScript 和 CSS；Tauri 2 与 Rust 负责窗口、订阅下载和文件存储。SwiftUI、EventKit 和 WidgetKit 属于 macOS 工程；改动不会自动同步到 Windows。
 
-## 环境
+## 准备环境
 
-- Node.js 22.12+（或 24 / 26），附带 npm。
-- Rust stable，Windows 默认 MSVC 工具链。
-- Microsoft C++ Build Tools，安装“使用 C++ 的桌面开发”工作负载及 Windows SDK。
-- Microsoft Edge WebView2 Runtime。
+- 使用 Windows x64 和 PowerShell。仓库的正式打包脚本针对 `x86_64-pc-windows-msvc`。
+- 安装 Git、Node.js 22.12 或以上（可用 24 LTS）及 npm。保留 `package-lock.json` 和 `src-tauri/Cargo.lock`。
+- 安装 Visual Studio Build Tools 的「使用 C++ 的桌面开发」工作负载、MSVC 和 Windows SDK，再通过 rustup 安装 Rust stable MSVC 工具链。
+- 确认已安装 Microsoft Edge WebView2 Runtime。原生窗口用它渲染；缺失时安装 Evergreen Runtime。更多说明见 [Tauri 环境要求](https://v2.tauri.app/zh-cn/start/prerequisites/)。
 
-官方环境要求：https://v2.tauri.app/start/prerequisites/
-
-安装工具后重新打开终端，让 PATH 生效。若依赖下载失败，检查本机网络、代理和受信任证书；不要复制作者 Mac 的代理地址、证书路径或禁用 TLS 校验。
-
-## 拉取与编译（PowerShell）
+重新打开 PowerShell，然后执行：
 
 ```powershell
+node --version
+npm.cmd --version
+rustc -vV
+rustup default stable-x86_64-pc-windows-msvc
+
 git clone https://github.com/billow-css/CampusGo-Ultra.git
 cd CampusGo-Ultra\Desktop
-npm ci
-npm run build
-npm test
-cargo test --manifest-path src-tauri/Cargo.toml
-npm run tauri build
+npm.cmd ci
+npm.cmd run tauri dev
 ```
 
-如果已经克隆仓库，先在没有未提交修改的情况下执行 `git pull`，然后进入 `Desktop`。保留 `package-lock.json` 和 `src-tauri/Cargo.lock`，不要为了编译随意升级全部依赖。
+日常改界面也可运行 `npm.cmd run dev`，打开终端显示的本地地址（默认 1420 端口）。浏览器预览用 `localStorage`，可以导入 ICS 文件；订阅下载、原生保存与 Windows 首次访问校验需要实际启动 Tauri。可用「先看示例」体验课表，演示数据与正式数据分开。
 
-NSIS 安装程序输出在 `Desktop/src-tauri/target/release/bundle/nsis/`。当前版本为 1.0.0 LTS；构建与验证范围见 [1.0.0 发布记录](Release-1.0.0.md)。安装包尚未配置发布者代码签名。
+## 从哪里改
 
-也可在仓库根目录运行可重复打包脚本：
+| 路径（相对 `Desktop/`） | 内容 |
+| --- | --- |
+| `src/main.tsx`、`src/style.css` | 页面、交互、布局与主题 |
+| `src/core.ts`、`src/calendar.worker.ts` | 课程、考试、待办与 ICS 解析 |
+| `src/storage.ts`、`src-tauri/src/main.rs` | 前端存储适配、原生数据读写与日历下载 |
+| `src/AccessGate.tsx`、`src-tauri/src/access.rs` | Windows 首次访问的本地逻辑，见 [维护说明](Windows-Access-Check.md) |
+| `src-tauri/tauri.conf.json`、`src-tauri/windows/` | 应用窗口、权限相关配置及 NSIS 安装钩子 |
+
+新增原生命令时，限制输入、可访问的资源与返回的数据；避免让界面直接执行 shell 命令或读写任意路径。Windows 版没有 macOS 桌面小组件，也不加载 macOS 的 Swift 插件或兼容其原生 JSON 备份。迁移课表可重新导入 ICS 或在 Windows 版重新设置订阅。
+
+## 测试与打包
+
+在 `Desktop/` 中执行：
+
+```powershell
+npm.cmd run build
+npm.cmd test
+cargo test --locked --manifest-path src-tauri/Cargo.toml
+npx.cmd playwright install chromium
+npm.cmd run test:e2e
+```
+
+正式打包从仓库根目录运行：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File Tools/build-windows.ps1
 ```
 
-脚本固定构建 `x86_64-pc-windows-msvc`，执行前端 / Rust 测试并使用 Cargo
-`--locked`，然后将安装程序、许可证和 SHA-256 校验和复制到
-`dist/windows-x86_64/`。指定目标后，Tauri 原始产物位于
-`Desktop/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/`。
-首次启动安装程序需要 Windows WebView2；若机器未安装，安装程序会联网获取运行时。
+脚本执行前端和 Rust 测试，用锁定的 Cargo 依赖构建 x64 NSIS 安装程序，并输出到 `dist/windows-x86_64/`：`CampusGo-Ultra_<版本>_windows-x86_64-setup.exe`、`LICENSE`、`NOTICE` 和 `SHA256SUMS.txt`。原始安装程序在 `Desktop/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/`。脚本不配置发布者签名，也不上传 GitHub Release。
 
-## 运行与检查
+提交前至少在 Windows 实机检查安装、从开始菜单启动、导入 ICS、订阅同步、重启后数据恢复、主题和窗口缩放。若改动首次访问逻辑或安装钩子，额外检查卸载和重装（访问校验标记可能保留）。在报告中注明系统、架构、WebView2 版本和复现步骤，并使用脱敏日志。1.0.0 的历史验证范围见 [发布记录](Release-1.0.0.md)。
 
-`0.2.0-alpha.2` 新增 Windows 首次输入 QQ 号的本地访问校验，以及保留至卸载后的
-拦截标记。用途说明、局限与维护方式见 [Windows 本地访问校验](Windows-Access-Check.md)。
-
-```powershell
-npm run tauri dev
-```
-
-首次启动默认课表为空，可点击“先看示例”，或者从设置导入自己的 ICS / 订阅链接。正式数据与示例数据隔离；Tauri 保存至自身应用数据目录，不访问现有 Mac 应用的数据。
-
-浏览器交互测试：
-
-```powershell
-npx playwright install chromium
-npm run test:e2e
-```
-
-浏览器预览：`npm run dev`，默认地址 `http://127.0.0.1:1420`。浏览器版使用 localStorage，订阅下载需要 Tauri 主进程，浏览器检查时用 ICS 文件导入。
-
-## 交付前必查
-
-- 四页切换、紧凑课表、深浅色及窗口缩放正常。
-- 在 Windows 上导入 ICS、同步自己的订阅、标记 / 添加考试。
-- 添加日程与多行作业子项，退出重开后检查保存；切换演示不写入真实数据。
-- 番茄钟循环 / 暂停 / 重开、桌宠选图 / 拖动 / 台词正常。
-- 实际运行 NSIS 安装、启动、退出及卸载。记录 Windows 版本、CPU 架构和测试结果。
-- 保留原 Mac 版 Release，不用 Windows 预览覆盖 Mac 的 v0.1.0 资产。若之后需要发布 Windows，使用单独的版本说明及附件。
-
-本次已有 Mac 上的前端生产构建、16 项前端逻辑测试、4 项 Playwright 检查、Rust 编译及 4 项测试；这些不能代替 Windows 测试。功能边界见 `Desktop/README.md`。
-
-## 可以交给 Windows Codex 的任务
-
-> 在 Windows 上读取 Docs/Windows.md 和 Desktop/README.md，安装或检查必要环境，在 Desktop 中使用锁文件安装依赖，完成前端 / Rust 测试与 Tauri NSIS 打包；修复实际遇到的 Windows 兼容问题，并实测安装与启动。尽量保留现有界面，避免改动 Mac SwiftUI 版，不上传个人课表、订阅、签名配置或私人桌宠图片。先交付本地安装程序和测试记录。
+遇到 `link.exe` 或 SDK 错误时，检查 C++ 工作负载、`rustc -vV` 的 `host` 是否为 MSVC，必要时用 Developer PowerShell 重试。窗口空白时先检查 WebView2 和 `npm.cmd run tauri dev` 的终端输出。如果只是浏览器预览中的订阅失败，改用 Tauri 或先导入本地 ICS。

@@ -4,7 +4,7 @@
 
 面向大学生的 macOS 原生日程应用，把一周课表、考试、作业和个人待办放在一起。使用 SwiftUI 构建，配套 WidgetKit 桌面小组件，支持本地数据保存与可扩展的内置模块。
 
-> 当前版本为早期开发版，主要界面语言为简体中文。提供未经 Apple 公证的 macOS 安装包，也可自行构建源码。本项目为个人项目，与南京信息工程大学或其他学校无官方隶属关系。
+> 当前源码版本为 **2.0.0**，主要界面语言为简体中文。提供未经 Apple 公证的 macOS 安装包，也可自行构建源码。本项目为个人项目，与南京信息工程大学或其他学校无官方隶属关系。
 
 ## 下载与安装
 
@@ -12,13 +12,13 @@
 
 测试版采用临时签名，没有 Developer ID 签名与 Apple 公证。首次被系统阻止时，可在确认来源后按教程进入 **系统设置 → 隐私与安全性 → 仍要打开**。小组件跨设备共享数据访问尚未验证，可能需要自行配置签名和 App Group；此操作不会自动补齐这些能力。
 
-## Windows / Fedora · 1.0.0 LTS
+## Windows / Fedora
 
-`Desktop/` 提供 **Tauri 2 + Rust + React/TypeScript** 版本，沿用现有 Mac 版的导航、紧凑周课表、登机牌、日程 / 作业双栏与主题。开发启动方式与当前功能边界见 [Desktop/README.md](Desktop/README.md)。
+`Desktop/` 提供 **Tauri 2 + Rust + React/TypeScript** 版本，沿用现有 Mac 版的导航、紧凑周课表、登机牌、日程 / 作业双栏与主题。开发与打包见 [Windows 开发指南](Docs/Windows.md) 和 [Fedora 构建指南](Docs/Fedora.md)；功能边界见 [桌面端说明](Desktop/README.md)。
 
 前往 [1.0.0 LTS for Windows/Fedora](https://github.com/billow-css/CampusGo-Ultra/releases/tag/v1.0.0)
 下载 Windows x64 安装包或 Fedora x86_64 构建套件。Windows 包已完成本机安装与运行检查；
-Fedora 套件提供源码和 RPM 构建脚本，本次未提供预编译 RPM。桌面版数据与 Mac SwiftUI 版独立，原有 Mac DMG 保留。
+Fedora 套件提供源码和 RPM 构建脚本，本次未提供预编译 RPM。桌面版数据与 Mac SwiftUI 版独立，原有 Mac DMG 保留。2.0.0 的源码变更与验证范围见 [版本记录](Docs/Release-2.0.0.md)。
 
 ## 功能
 
@@ -127,7 +127,7 @@ Swift Package 仅包含可独立测试的核心逻辑，不构建整个 SwiftUI 
 ```sh
 python3 Tools/package_pkg.py \
   --app "DerivedData/Build/Products/Release/CampusGo Ultra.app" \
-  --output dist/CampusGo-Ultra-0.1.1-universal.pkg
+  --output dist/CampusGo-Ultra-2.0.0-universal.pkg
 ```
 
 构建时应指定 `ARCHS='arm64 x86_64' ONLY_ACTIVE_ARCH=NO`。脚本检查双架构与私人图片排除，为主应用及扩展添加临时签名，生成带安装提示和许可证的 PKG，并输出 SHA-256 校验文件。也可用 `Tools/package_dmg.py` 制作 DMG。该过程不会进行 Apple 公证，也不授予跨设备共享组能力。
@@ -158,7 +158,7 @@ CampusSchedule.xcodeproj/  主应用与小组件工程
 - 启用 / 关闭生命周期及摘要固定和排序。
 - 独立存储与明确声明的数据访问能力。
 
-番茄钟、桌宠与 Agenda 通过同一套接口注册。关闭番茄钟会暂停计时并停止刷新；关闭桌宠会移除悬浮层；关闭 Agenda 会隐藏其入口与课表标记并保留计划。详见 [模块接口说明](Docs/Modules.md)。
+番茄钟、桌宠与 Agenda 通过同一套接口注册。关闭番茄钟会暂停计时并停止刷新；关闭桌宠会移除悬浮层；关闭 Agenda 会隐藏其入口与课表标记并保留计划。详见 [模块接口说明](Docs/Modules.md)。第三方贡献者可按 [外部插件开发指南](Docs/PluginDevelopment.md) 编写、调试和提交模块。
 
 **当前不支持下载、安装或执行外部第三方插件。** 接口中的权限声明是进程内编程约束，并非针对不可信代码的隔离机制。
 

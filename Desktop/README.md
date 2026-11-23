@@ -1,6 +1,6 @@
-# CampusGo Ultra · 1.0.0 LTS for Windows/Fedora
+# CampusGo Ultra · Windows / Fedora
 
-此目录为 Windows / Fedora 桌面版，使用 React + TypeScript 界面、Tauri 2 + Rust 主进程。现有 Mac SwiftUI 应用仍保留在仓库根目录。
+此目录为 Windows / Fedora 桌面版（当前源码版本为 **2.0.0**），使用 React + TypeScript 界面、Tauri 2 + Rust 主进程。现有 Mac SwiftUI 应用仍保留在仓库根目录。
 
 [下载 1.0.0 LTS](https://github.com/billow-css/CampusGo-Ultra/releases/tag/v1.0.0)：
 Windows 提供 x64 安装包，Fedora 提供源码与 RPM 构建脚本，未附预编译 RPM。
@@ -27,7 +27,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-Windows 端交接步骤见 [Windows 构建指南](../Docs/Windows.md)。
+Windows 环境配置、开发与测试见 [Windows 开发指南](../Docs/Windows.md)。
 
 Fedora x86_64 的 RPM 配置与构建步骤见 [Fedora 构建指南](../Docs/Fedora.md)。
 在仓库根目录执行 `bash Tools/build-fedora.sh --install-deps`；Windows 可执行
@@ -57,7 +57,7 @@ Windows 构建输出 NSIS `.exe` 安装程序，位于 `src-tauri/target/release
 
 ## 当前边界
 
-当前 Windows 包已完成本机安装与运行检查，Fedora 提供构建套件。尚未实现 Windows 系统小组件、托盘 / 后台系统提醒、自动更新、Mac 原始 JSON 备份迁移、完整任务编辑和模块拖拽排序；摘要模块当前通过“前移 / 后移”调整。桌宠目前为窗口内显示，保留图片比例但手势边界使用方形占位。
+历史发布的 Windows 1.0.0 包已完成安装与运行检查，Fedora 1.0.0 提供构建套件。尚未实现 Windows 系统小组件、托盘 / 后台系统提醒、自动更新、Mac 原始 JSON 备份迁移、完整任务编辑和模块拖拽排序；摘要模块当前通过“前移 / 后移”调整。桌宠目前为窗口内显示，保留图片比例但手势边界使用方形占位。
 
 原 Mac 版 JSON 使用 Swift 日期编码，不能直接当作本版数据导入；当前两个应用的数据相互独立。桌面版备份可能包含个人课表、订阅地址与自定义图片，请勿上传。
 
