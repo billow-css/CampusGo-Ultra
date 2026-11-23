@@ -37,7 +37,7 @@ for folder in ["App", "Shared", "Widget", "Configuration", "Resources"]:
     groups.append(add("group:" + folder, "PBXGroup", name=folder, children=children, sourceTree="<group>"))
 
 frameworks = {}
-for name in ["SwiftUI", "EventKit", "WidgetKit"]:
+for name in ["SwiftUI", "EventKit", "WidgetKit", "WebKit"]:
     frameworks[name] = add("framework:" + name, "PBXFileReference", lastKnownFileType="wrapper.framework",
         name=name + ".framework", path="System/Library/Frameworks/" + name + ".framework", sourceTree="SDKROOT")
 groups.append(add("group:frameworks", "PBXGroup", name="Frameworks", children=list(frameworks.values()), sourceTree="<group>"))
@@ -67,7 +67,7 @@ def target(name, sourceFolders, bundle, plist, entitlements, product, productTyp
         if path.endswith(".swift") and path.split("/")[0] in sourceFolders]
     sources = add("sources:" + name, "PBXSourcesBuildPhase", buildActionMask=2147483647, files=builds, runOnlyForDeploymentPostprocessing=0)
     linked = [add("link:" + name + ":" + fw, "PBXBuildFile", fileRef=frameworks[fw])
-        for fw in (["SwiftUI", "WidgetKit", "EventKit"] if name == "CampusSchedule" else ["SwiftUI", "WidgetKit"])]
+        for fw in (["SwiftUI", "WidgetKit", "EventKit", "WebKit"] if name == "CampusSchedule" else ["SwiftUI", "WidgetKit"])]
     frameworkPhase = add("links:" + name, "PBXFrameworksBuildPhase", buildActionMask=2147483647, files=linked, runOnlyForDeploymentPostprocessing=0)
     resourceFiles = [add("resource:" + name + ":" + path, "PBXBuildFile", fileRef=file)
         for path, file in files.items() if path.startswith("Resources/") and (name == "CampusSchedule" or path == "Resources/NUISTGo.icns")]

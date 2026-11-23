@@ -41,9 +41,10 @@ struct DiscoveryView: View {
         }
     }
     private func moduleCard(_ descriptor: ModuleDescriptor) -> some View {
-        VStack(alignment: .leading, spacing: 18) {
+        let ink = descriptor.accent?.color ?? self.ink
+        return VStack(alignment: .leading, spacing: 18) {
             HStack(spacing: 13) {
-                Image(systemName: descriptor.icon).font(.system(size: 25, weight: .medium)).foregroundStyle(ink)
+                ModuleIcon(name: descriptor.icon, size: 25).font(.system(size: 25, weight: .medium)).foregroundStyle(ink)
                     .frame(width: 50, height: 50).background(ink.opacity(0.09), in: RoundedRectangle(cornerRadius: 12))
                 VStack(alignment: .leading, spacing: 5) {
                     Text(descriptor.name).font(.system(size: 19, weight: .semibold))
@@ -77,7 +78,7 @@ struct DiscoveryView: View {
                 }
                 Button(descriptor.surfaces.contains(.detail) ? "打开" : "查看") {
                     onOpen(descriptor.id, !descriptor.surfaces.contains(.detail))
-                }.buttonStyle(.borderedProminent).disabled(!manager.isEnabled(descriptor.id))
+                }.buttonStyle(.borderedProminent).tint(ink).disabled(!manager.isEnabled(descriptor.id))
             }.controlSize(.small)
         }.padding(22).background(CampusTheme.board, in: RoundedRectangle(cornerRadius: 15))
             .overlay { RoundedRectangle(cornerRadius: 15).strokeBorder(CampusTheme.boardLine) }
@@ -162,7 +163,7 @@ struct ModulePage: View {
                 if let content = module.detail(context: context) { content }
             } else {
                 VStack(spacing: 18) {
-                    Image(systemName: module.descriptor.icon).font(.largeTitle)
+                    ModuleIcon(name: module.descriptor.icon, size: 32).font(.largeTitle)
                     Text(module.descriptor.name + "已关闭").font(.title2)
                     Button("启用功能") { manager.setEnabled(id, true) }.buttonStyle(.borderedProminent)
                     Button(returnTitle, action: onBack)

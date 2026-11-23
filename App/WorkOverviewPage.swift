@@ -8,7 +8,7 @@ struct WorkOverviewPage: View {
         let summary = WorkSummary(snapshot: store.snapshot, now: now)
         return VStack(spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
-                Text("作业与日程").font(.system(size: 23, weight: .semibold))
+                Text("Plans").font(.system(size: 23, weight: .semibold))
                 Spacer()
                 Text(now.formatted(.dateTime.month().day().weekday(.wide)))
                     .font(.system(size: 12)).foregroundStyle(.secondary)

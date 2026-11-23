@@ -1,6 +1,12 @@
 import Foundation
 
-enum ModuleSurface: String, Codable, Hashable { case summary, detail, settings, overlay }
+enum ModuleSurface: String, Codable, Hashable { case summary, detail, settings, overlay, navigation, calendarIndicator }
+enum ModuleAccent: String, Codable { case grass }
+struct ModuleDayIndicator {
+    let count: Int
+    let label: String
+    let accent: ModuleAccent
+}
 enum ModulePermission: String, Codable, Hashable { case readCourses, readHomework, readTodos, createTodo, writeHomework }
 struct ModuleDescriptor: Codable, Hashable, Identifiable {
     let id: String
@@ -11,15 +17,17 @@ struct ModuleDescriptor: Codable, Hashable, Identifiable {
     var interfaceVersion = 1
     var surfaces: Set<ModuleSurface>
     var permissions: Set<ModulePermission> = []
+    var accent: ModuleAccent? = nil
 }
 enum ModuleError: LocalizedError {
-    case invalidIdentifier, duplicateIdentifier, unsupportedInterface, noSurface, unavailable, missingPermission
+    case invalidIdentifier, duplicateIdentifier, unsupportedInterface, noSurface, missingDetail, unavailable, missingPermission
     var errorDescription: String? {
         switch self {
         case .invalidIdentifier: return "模块标识格式无效。"
         case .duplicateIdentifier: return "模块标识重复。"
         case .unsupportedInterface: return "模块接口版本不受支持。"
         case .noSurface: return "模块未提供展示入口。"
+        case .missingDetail: return "提供顶栏入口的模块必须同时提供独立页面。"
         case .unavailable: return "模块当前不可用。"
         case .missingPermission: return "模块未声明所需的数据能力。"
         }
@@ -39,6 +47,7 @@ struct ModuleRegistry {
             guard ids.insert(descriptor.id).inserted else { throw ModuleError.duplicateIdentifier }
             guard descriptor.interfaceVersion == Self.interfaceVersion else { throw ModuleError.unsupportedInterface }
             guard !descriptor.surfaces.isEmpty else { throw ModuleError.noSurface }
+            guard !descriptor.surfaces.contains(.navigation) || descriptor.surfaces.contains(.detail) else { throw ModuleError.missingDetail }
         }
         self.descriptors = descriptors
     }
@@ -94,4 +103,17 @@ struct ModuleStorage {
         defaults.set(try JSONEncoder().encode(value), forKey: prefix + key)
     }
     func remove(key: String) { defaults.removeObject(forKey: prefix + key) }
+}
+
+struct NavigationPreferences: Codable, Equatable {
+    var hiddenTabs: Set<String> = []
+    static let fixedTabs: Set<String> = ["home", "schedule"]
+    func isVisible(_ id: String) -> Bool { Self.fixedTabs.contains(id) || !hiddenTabs.contains(id) }
+    mutating func setVisible(_ id: String, _ visible: Bool) {
+        guard !Self.fixedTabs.contains(id) else { return }
+        if visible { hiddenTabs.remove(id) } else { hiddenTabs.insert(id) }
+    }
+    func resolvedPage(_ page: String, moduleOrigin: String = "discover") -> String {
+        isVisible(page == "module" ? moduleOrigin : page) ? page : "schedule"
+    }
 }

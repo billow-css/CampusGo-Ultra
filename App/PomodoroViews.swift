@@ -48,11 +48,16 @@ final class PomodoroStore: ObservableObject {
 struct PomodoroCard: View {
     @EnvironmentObject private var timer: PomodoroStore
     let onExpand: () -> Void
+    var onSettings: (() -> Void)? = nil
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Label("番茄钟", systemImage: "timer").font(.system(size: 13, weight: .semibold))
                 Spacer()
+                if let onSettings {
+                    Button(action: onSettings) { Image(systemName: "gearshape") }
+                        .buttonStyle(.plain).foregroundStyle(.secondary).help("番茄钟设置")
+                }
                 Button(action: onExpand) { Image(systemName: "arrow.up.left.and.arrow.down.right") }
                     .buttonStyle(.plain).foregroundStyle(.secondary).help("展开专注视图")
             }
@@ -67,12 +72,15 @@ struct PomodoroCard: View {
 struct FocusPage: View {
     let onBack: () -> Void
     var backTitle = "返回摘要"
+    var navigationVisible: Binding<Bool>? = nil
+    @State private var showingSettings = false
     var body: some View {
         VStack(spacing: 24) {
             HStack {
                 Button(action: onBack) { Label(backTitle, systemImage: "chevron.left") }.buttonStyle(.plain)
                 Spacer()
                 Text("专注空间").font(.system(size: 13, weight: .medium)).foregroundStyle(.secondary)
+                Button { showingSettings = true } label: { Label("设置", systemImage: "gearshape") }.buttonStyle(.borderless)
             }.padding(24)
             Spacer(minLength: 0)
             PomodoroDisplay(expanded: true)
@@ -82,6 +90,14 @@ struct FocusPage: View {
             Spacer(minLength: 24)
         }.frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(CampusTheme.board)
+            .onExitCommand(perform: onBack)
+            .sheet(isPresented: $showingSettings) {
+                VStack(spacing: 0) {
+                    PomodoroSettingsView(navigationVisible: navigationVisible)
+                    Divider()
+                    HStack { Spacer(); Button("完成") { showingSettings = false }.keyboardShortcut(.cancelAction) }.padding(16)
+                }.frame(width: 560, height: 650)
+            }
     }
 }
 
@@ -170,18 +186,89 @@ private struct PomodoroControls: View {
 
 struct PomodoroSettingsView: View {
     @EnvironmentObject private var timer: PomodoroStore
+    var navigationVisible: Binding<Bool>? = nil
+    private var focusMinutes: Int { timer.session.cycles * 25 }
+    private var restMinutes: Int { max(0, timer.session.cycles - 1) * 5 }
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("计时配置").font(.title2).fontWeight(.semibold)
-            Text("每轮专注 25 分钟，轮间休息 5 分钟。最后一轮结束后直接完成。").foregroundStyle(.secondary)
-            Stepper("循环 \(timer.session.cycles) 次", value: Binding(get: { timer.session.cycles }, set: { timer.setCycles($0) }), in: 1...12)
-                .disabled(timer.session.isActive).frame(maxWidth: 350)
-            if timer.session.isActive {
-                Text("计时进行中，重置后可修改循环次数。").font(.caption).foregroundStyle(.secondary)
-                Button("重置本次计时") { timer.reset() }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("番茄钟设置").font(.title2).fontWeight(.semibold)
+                    Text("安排本次专注节奏，修改后自动保存。").font(.system(size: 12)).foregroundStyle(.secondary)
+                }
+                HStack(spacing: 12) {
+                    durationCard("专注", minutes: 25, icon: "flame", ink: CampusTheme.examAccent)
+                    durationCard("休息", minutes: 5, icon: "cup.and.saucer", ink: CampusTheme.accent)
+                }
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack {
+                        Text("循环轮数").font(.system(size: 14, weight: .semibold))
+                        Spacer()
+                        Stepper(value: Binding(get: { timer.session.cycles }, set: { timer.setCycles($0) }), in: 1...12) {
+                            Text("\(timer.session.cycles) 轮").font(.system(size: 13, weight: .medium, design: .rounded)).monospacedDigit()
+                        }.fixedSize().disabled(timer.session.isActive)
+                    }
+                    HStack(spacing: 8) {
+                        ForEach([1, 2, 4, 8], id: \.self) { count in
+                            Button { timer.setCycles(count) } label: {
+                                Text("\(count) 轮").font(.system(size: 12, weight: timer.session.cycles == count ? .semibold : .regular))
+                                    .frame(maxWidth: .infinity).padding(.vertical, 8)
+                                    .foregroundStyle(timer.session.cycles == count ? CampusTheme.examAccent : Color.primary)
+                                    .background(timer.session.cycles == count ? CampusTheme.examAccent.opacity(0.10) : Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 7))
+                                    .overlay { RoundedRectangle(cornerRadius: 7).strokeBorder(timer.session.cycles == count ? CampusTheme.examAccent.opacity(0.45) : .clear) }
+                            }.buttonStyle(.plain).disabled(timer.session.isActive)
+                        }
+                    }
+                    VStack(alignment: .leading, spacing: 5) {
+                        Label("预计 \(duration(focusMinutes + restMinutes))", systemImage: "clock").font(.system(size: 13, weight: .medium))
+                        Text("专注 \(focusMinutes) 分钟 · 休息 \(restMinutes) 分钟").font(.system(size: 11)).foregroundStyle(.secondary)
+                    }
+                    Text("轮间自动休息，最后一轮专注完成后结束。可设置 1–12 轮。")
+                        .font(.system(size: 11)).foregroundStyle(.secondary)
+                    if timer.session.isActive {
+                        Divider()
+                        HStack {
+                            Label("\(timer.session.isPaused ? "已暂停" : "计时中") · 第 \(timer.session.currentCycle)/\(timer.session.cycles) 轮", systemImage: timer.session.isPaused ? "pause.circle" : "timer")
+                                .font(.system(size: 11)).foregroundStyle(.secondary)
+                            Spacer()
+                            Button("重置后调整") { timer.reset() }.buttonStyle(.bordered).controlSize(.small)
+                        }
+                    }
+                }.padding(18).settingsCard()
+                if let navigationVisible {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Toggle(isOn: navigationVisible) {
+                            Label("在顶栏常驻番茄钟", systemImage: "rectangle.topthird.inset.filled").font(.system(size: 13, weight: .medium))
+                        }.toggleStyle(.switch).controlSize(.small)
+                        Text("关闭后，从摘要展开时仍会临时显示标签页；退出展开后收起。")
+                            .font(.system(size: 11)).foregroundStyle(.secondary)
+                    }.padding(18).settingsCard()
+                }
+                Label("关闭模块会暂停并保留进度；再次启用后可手动继续。", systemImage: "info.circle")
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
             }
-            Text("关闭模块时会暂停并保留当前进度；再次启用后可以手动继续。").font(.caption).foregroundStyle(.secondary)
-            Spacer()
-        }.padding(24).frame(maxWidth: .infinity, alignment: .leading)
+            .padding(24).frame(maxWidth: .infinity, alignment: .leading)
+        }.background(Color(nsColor: .windowBackgroundColor))
+    }
+    private func durationCard(_ title: String, minutes: Int, icon: String, ink: Color) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Label(title, systemImage: icon).font(.system(size: 12, weight: .medium)).foregroundStyle(ink)
+            HStack(alignment: .firstTextBaseline, spacing: 5) {
+                Text("\(minutes)").font(.system(size: 29, weight: .semibold, design: .rounded))
+                Text("分钟").font(.system(size: 11)).foregroundStyle(.secondary)
+            }
+        }.frame(maxWidth: .infinity, alignment: .leading).padding(16)
+            .background(ink.opacity(0.075), in: RoundedRectangle(cornerRadius: 12))
+    }
+    private func duration(_ minutes: Int) -> String {
+        if minutes < 60 { return "\(minutes) 分钟" }
+        return "\(minutes / 60) 小时" + (minutes % 60 == 0 ? "" : " \(minutes % 60) 分钟")
+    }
+}
+
+private extension View {
+    func settingsCard() -> some View {
+        background(CampusTheme.board, in: RoundedRectangle(cornerRadius: 12))
+            .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(CampusTheme.boardLine) }
     }
 }

@@ -39,6 +39,7 @@ dist/
 __pycache__/
 *.pyc
 *.dmg
+*.pkg
 
 # Cross-platform desktop dependencies and builds
 node_modules/

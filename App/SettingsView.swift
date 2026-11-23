@@ -29,6 +29,7 @@ struct SettingsView: View {
             HStack(alignment: .top, spacing: 0) {
                 VStack(alignment: .leading, spacing: 6) {
                     sectionButton("外观与主题", icon: "paintpalette", value: "appearance")
+                    sectionButton("标签页", icon: "rectangle.topthird.inset.filled", value: "tabs")
                     sectionButton("窗口桌宠", icon: "pawprint", value: "pet")
                     sectionButton("日历来源", icon: "calendar", value: "calendars")
                     sectionButton("课程与老师", icon: "person.text.rectangle", value: "courses")
@@ -43,6 +44,7 @@ struct SettingsView: View {
                 Group {
                     switch selection {
                     case "appearance": AppearanceSettingsView()
+                    case "tabs": NavigationSettingsView()
                     case "pet": WindowPetSettingsView()
                     case "courses": courseSettings
                     case "exams": ExamSettingsView()

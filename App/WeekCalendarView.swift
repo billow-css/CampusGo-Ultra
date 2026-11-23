@@ -4,6 +4,7 @@ import Combine
 struct WeekCalendarView: View {
     @Environment(\.nuistAccent) private var themeAccent
     @EnvironmentObject private var store: AppStore
+    @EnvironmentObject private var manager: ModuleManager
     @Binding var weekOffset: Int
     @State private var now = Date()
     private let calendar = Calendar.current
@@ -31,6 +32,10 @@ struct WeekCalendarView: View {
                 Color.clear.frame(width: axisWidth, height: 1)
                 ForEach(Array(days.enumerated()), id: \.offset) { index, day in
                     HStack(spacing: 5) {
+                        ForEach(Array(manager.calendarIndicators(on: day, calendar: calendar).enumerated()), id: \.offset) { _, indicator in
+                            Circle().fill(indicator.accent.indicatorColor(level: indicator.count))
+                                .frame(width: 5, height: 5).help(indicator.label).accessibilityLabel(indicator.label)
+                        }
                         Text(["周一", "周二", "周三", "周四", "周五", "周六", "周日"][index]).font(.system(size: 11))
                         Text(day.formatted(.dateTime.day())).font(.system(size: 14, weight: .semibold))
                     }.foregroundStyle(calendar.isDate(day, inSameDayAs: now) ? themeAccent : Color.secondary)
